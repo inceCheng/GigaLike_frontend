@@ -113,15 +113,12 @@ const fetchBlogs = async () => {
   try {
     // 尝试从API获取博客数据
     const response = await api.getBlogs()
-    if (response.data && response.data.data && response.data.data.length > 0) {
+    if (response.data && response.data.data) {
       blogs.value = response.data.data
-    } else {
-      // 使用模拟数据
-      blogs.value = mockBlogs
     }
   } catch (error) {
     console.error('获取博客列表失败:', error)
-    // 使用模拟数据
+    // API 请求失败时，依旧使用模拟数据（或者可以根据产品需求改成显示错误信息）
     blogs.value = mockBlogs
   } finally {
     loading.value = false

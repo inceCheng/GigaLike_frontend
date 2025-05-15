@@ -3,7 +3,8 @@
     <header class="app-header">
       <div class="header-content">
         <div class="logo">
-          <img src="/logo.png" alt="GigaLike Logo" />
+          <!-- <img src="/logo.png" alt="GigaLike Logo" /> -->
+          <img src="/vite.svg" alt="GigaLike Logo" />
           <span>GigaLike</span>
         </div>
         
