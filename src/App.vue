@@ -28,22 +28,42 @@
     <main class="app-main">
       <aside class="sidebar">
         <nav class="sidebar-nav">
-          <div class="nav-item active">
+          <div class="nav-item active" @click="router.push('/')">
             <i class="nav-icon fa-solid fa-house"></i>
             <span>首页</span>
           </div>
-          <div class="nav-item">
+          <div class="nav-item" @click="router.push('/discover')">
             <i class="nav-icon fa-solid fa-compass"></i>
             <span>发现</span>
           </div>
-          <div class="nav-item">
+          <div class="nav-item" @click="router.push('/messages')">
             <i class="nav-icon fa-solid fa-bell"></i>
             <span>消息</span>
           </div>
-          <div class="nav-item" @click="isLoggedIn() ? null : router.push('/login')">
+          <div class="nav-item" v-if="!loggedInState" @click="router.push('/login')">
             <i class="nav-icon fa-solid fa-user"></i>
-            <span>{{ isLoggedIn() ? '我' : '登录' }}</span>
+            <span>登录</span>
           </div>
+
+          <a-dropdown 
+            :trigger="['hover']" 
+            placement="bottom" 
+            overlayClassName="user-dropdown"
+            v-if="loggedInState"
+          >
+            <div class="nav-item">
+              <i class="nav-icon fa-solid fa-user"></i>
+              <span>我</span>
+            </div>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="1" @click="handleLogout">
+                  <template #icon><i class="fa-solid fa-right-from-bracket"></i></template>
+                  <span>退出登录</span>
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
         </nav>
       </aside>
       
@@ -78,15 +98,41 @@ const isLoggedIn = () => !!localStorage.getItem('gigaLikeUserId')
 // Reactive variable to trigger re-render on login/logout
 const loggedInState = ref(isLoggedIn())
 
-const logout = () => {
-  localStorage.removeItem('gigaLikeUserId')
-  loggedInState.value = false // Update reactive state
-  router.push('/login')
+const showUserMenu = ref(false)
+const showLoginHover = ref(false)
+
+const handleUserClick = (event) => {
+  if (!isLoggedIn()) {
+    router.push('/login')
+    return
+  }
+  showUserMenu.value = !showUserMenu.value
+  event.stopPropagation()
+}
+
+const handleLogout = async () => {
+  try {
+    const response = await fetch('/api/user/logout', {
+      method: 'GET',
+      credentials: 'include'
+    })
+    const data = await response.json()
+    if (data.code === 0) {
+      localStorage.removeItem('gigaLikeUserId')
+      loggedInState.value = false
+      router.push('/')
+    }
+  } catch (error) {
+    console.error('登出失败:', error)
+  }
 }
 
 // Watch route changes to update login state if needed (e.g., after login redirect)
 onMounted(() => {
   loggedInState.value = isLoggedIn();
+  document.addEventListener('click', () => {
+    showUserMenu.value = false
+  })
 });
 
 watch(
@@ -95,6 +141,13 @@ watch(
     loggedInState.value = isLoggedIn();
   }
 );
+
+// 监听登录状态变化
+watch(loggedInState, (newValue) => {
+  if (!newValue && route.path !== '/login' && route.path !== '/') {
+    router.push('/')
+  }
+})
 
 </script>
 
@@ -246,15 +299,25 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 12px;
+  padding: 12px 0;
 }
 
 .nav-item {
+  height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem 0;
+  justify-content: center;
+  padding: 12px 0;
   width: 100%;
   cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+  background-color: var(--light-gray);
 }
 
 .nav-item.active {
@@ -263,7 +326,7 @@ body {
 
 .nav-icon {
   font-size: 1.5rem;
-  margin-bottom: 0.3rem;
+  margin-bottom: 8px;
 }
 
 .content-container {
@@ -293,5 +356,40 @@ body {
 
 .footer-links a:hover {
   text-decoration: underline;
+}
+
+.user-dropdown {
+  min-width: 140px;
+}
+
+:deep(.ant-dropdown) {
+  margin-top: 0 !important;
+}
+
+:deep(.ant-dropdown-menu) {
+  padding: 6px;
+  border-radius: 8px;
+  box-shadow: 0 3px 6px -4px rgba(0,0,0,0.12), 0 6px 16px 0 rgba(0,0,0,0.08);
+}
+
+:deep(.ant-dropdown-menu-item) {
+  padding: 12px 16px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  line-height: 24px;
+  transition: all 0.2s ease;
+}
+
+:deep(.ant-dropdown-menu-item:hover) {
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+:deep(.ant-dropdown-menu-item i) {
+  font-size: 16px;
 }
 </style> 

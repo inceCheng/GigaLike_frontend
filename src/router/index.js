@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import BlogDetailView from '../views/BlogDetailView.vue'
+import Discover from '../views/Discover.vue'
+import Messages from '../views/Messages.vue'
 
 const routes = [
   {
@@ -33,6 +35,16 @@ const routes = [
         next()
       }
     },
+  },
+  {
+    path: '/discover',
+    name: 'Discover',
+    component: Discover
+  },
+  {
+    path: '/messages',
+    name: 'Messages',
+    component: Messages
   },
   // Add a catch-all route for 404 Not Found if desired
   // { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFoundView }
