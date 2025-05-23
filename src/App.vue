@@ -28,42 +28,49 @@
     <main class="app-main">
       <aside class="sidebar">
         <nav class="sidebar-nav">
-          <div class="nav-item active" @click="router.push('/')">
+          <div 
+            class="nav-item" 
+            :class="{ active: route.path === '/' }"
+            @click="router.push('/')"
+          >
             <i class="nav-icon fa-solid fa-house"></i>
             <span>首页</span>
           </div>
-          <div class="nav-item" @click="router.push('/discover')">
+          <div 
+            class="nav-item" 
+            :class="{ active: route.path === '/discover' }"
+            @click="router.push('/discover')"
+          >
             <i class="nav-icon fa-solid fa-compass"></i>
             <span>发现</span>
           </div>
-          <div class="nav-item" @click="router.push('/messages')">
+          <div 
+            class="nav-item" 
+            :class="{ active: route.path === '/messages' }"
+            @click="router.push('/messages')"
+          >
             <i class="nav-icon fa-solid fa-bell"></i>
             <span>消息</span>
           </div>
-          <div class="nav-item" v-if="!loggedInState" @click="router.push('/login')">
+          <div 
+            class="nav-item" 
+            v-if="!loggedInState" 
+            :class="{ active: route.path === '/login' }"
+            @click="router.push('/login')"
+          >
             <i class="nav-icon fa-solid fa-user"></i>
             <span>登录</span>
           </div>
 
-          <a-dropdown 
-            :trigger="['hover']" 
-            placement="bottom" 
-            overlayClassName="user-dropdown"
+          <div 
+            class="nav-item" 
+            :class="{ active: route.path === '/profile' }"
+            @click="router.push('/profile')"
             v-if="loggedInState"
           >
-            <div class="nav-item">
-              <i class="nav-icon fa-solid fa-user"></i>
-              <span>我</span>
-            </div>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item key="1" @click="handleLogout">
-                  <template #icon><i class="fa-solid fa-right-from-bracket"></i></template>
-                  <span>退出登录</span>
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
+            <i class="nav-icon fa-solid fa-user"></i>
+            <span>我</span>
+          </div>
         </nav>
       </aside>
       
@@ -87,6 +94,7 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { ref, watch, onMounted } from 'vue'
+import { Modal, message } from 'ant-design-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -111,20 +119,34 @@ const handleUserClick = (event) => {
 }
 
 const handleLogout = async () => {
-  try {
-    const response = await fetch('/api/user/logout', {
-      method: 'GET',
-      credentials: 'include'
-    })
-    const data = await response.json()
-    if (data.code === 0) {
-      localStorage.removeItem('gigaLikeUserId')
-      loggedInState.value = false
-      router.push('/')
+  Modal.confirm({
+    title: '退出登录',
+    content: '确定要退出登录吗？',
+    okText: '确定',
+    cancelText: '取消',
+    class: 'custom-modal',
+    okButtonProps: {
+      danger: true
+    },
+    async onOk() {
+      try {
+        const response = await fetch('/api/user/logout', {
+          method: 'GET',
+          credentials: 'include'
+        })
+        const data = await response.json()
+        if (data.code === 0) {
+          localStorage.removeItem('gigaLikeUserId')
+          loggedInState.value = false
+          router.push('/')
+          message.success('已成功退出登录')
+        }
+      } catch (error) {
+        console.error('登出失败:', error)
+        message.error('退出登录失败，请稍后重试')
+      }
     }
-  } catch (error) {
-    console.error('登出失败:', error)
-  }
+  })
 }
 
 // Watch route changes to update login state if needed (e.g., after login redirect)
@@ -317,16 +339,39 @@ body {
 }
 
 .nav-item:hover {
-  background-color: var(--light-gray);
+  color: var(--primary-color);
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1);
 }
 
 .nav-item.active {
   color: var(--primary-color);
 }
 
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background-color: var(--secondary-color);
+  border-radius: 12px;
+  z-index: -1;
+  top: 8px;
+}
+
 .nav-icon {
   font-size: 1.5rem;
   margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.2s ease;
+}
+
+.nav-item span {
+  font-size: 12px;
+  margin-top: 4px;
 }
 
 .content-container {
@@ -358,38 +403,27 @@ body {
   text-decoration: underline;
 }
 
-.user-dropdown {
-  min-width: 140px;
-}
-
-:deep(.ant-dropdown) {
-  margin-top: 0 !important;
-}
-
-:deep(.ant-dropdown-menu) {
-  padding: 6px;
-  border-radius: 8px;
-  box-shadow: 0 3px 6px -4px rgba(0,0,0,0.12), 0 6px 16px 0 rgba(0,0,0,0.08);
-}
-
-:deep(.ant-dropdown-menu-item) {
-  padding: 12px 16px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 48px;
-  line-height: 24px;
-  transition: all 0.2s ease;
-}
-
+.user-dropdown,
+:deep(.ant-dropdown),
+:deep(.ant-dropdown-menu),
+:deep(.ant-dropdown-menu-item),
 :deep(.ant-dropdown-menu-item:hover) {
-  background-color: var(--secondary-color);
-  color: var(--primary-color);
-  transform: translateY(-1px);
+  display: none;
 }
 
-:deep(.ant-dropdown-menu-item i) {
-  font-size: 16px;
+/* Add styles for the custom modal */
+:deep(.custom-modal .ant-btn-primary) {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+:deep(.custom-modal .ant-btn-primary:hover) {
+  background-color: #ff1a1a;
+  border-color: #ff1a1a;
+}
+
+:deep(.custom-modal .ant-btn-default:hover) {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 </style> 
