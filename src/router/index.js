@@ -6,6 +6,7 @@ import ProfilePage from '../views/ProfilePage.vue'
 import BlogDetailView from '../views/BlogDetailView.vue'
 import Discover from '../views/Discover.vue'
 import Messages from '../views/Messages.vue'
+import { useUserStore } from '@/stores/user'
 
 const routes = [
   {
@@ -19,7 +20,8 @@ const routes = [
     name: 'Login',
     component: LoginPage,
     beforeEnter: (to, from, next) => {
-      if (localStorage.getItem('gigaLikeUserId')) {
+      const userStore = useUserStore()
+      if (userStore.isLoggedIn) {
         next({ name: 'Home' })
       } else {
         next()
@@ -31,7 +33,8 @@ const routes = [
     name: 'Register',
     component: RegisterPage,
     beforeEnter: (to, from, next) => {
-      if (localStorage.getItem('gigaLikeUserId')) {
+      const userStore = useUserStore()
+      if (userStore.isLoggedIn) {
         next({ name: 'Home' })
       } else {
         next()
@@ -71,12 +74,27 @@ const router = createRouter({
 })
 
 // 全局路由守卫
-router.beforeEach((to, from, next) => {
-  if (to.meta.requiresAuth && !localStorage.getItem('gigaLikeUserId')) {
-    next({ name: 'Login' })
-  } else {
-    next()
+router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
+  
+  // 如果路由需要认证
+  if (to.meta.requiresAuth) {
+    if (!userStore.isLoggedIn) {
+      // 用户未登录，跳转到登录页
+      next({ name: 'Login' })
+      return
+    }
+    
+    // 用户已登录，验证session是否有效
+    const isSessionValid = await userStore.validateSession()
+    if (!isSessionValid) {
+      // Session无效，跳转到登录页
+      next({ name: 'Login' })
+      return
+    }
   }
+  
+  next()
 })
 
 export default router 

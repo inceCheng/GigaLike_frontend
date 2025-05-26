@@ -1,14 +1,4 @@
-import axios from 'axios';
-
-const apiClient = axios.create({
-  // Vite proxy will handle redirecting to http://localhost:8123
-  baseURL: '/api'  // Using the base URL configured in vite.config.js
-});
-
-// Function to get current logged-in user ID from localStorage
-const getCurrentUserId = () => {
-  return localStorage.getItem('gigaLikeUserId');
-};
+import apiClient from './axios';
 
 export default {
   login(userId) {

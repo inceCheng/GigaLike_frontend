@@ -8,7 +8,12 @@
       <div class="form-group">
         <input type="password" v-model="password" placeholder="密码" />
       </div>
-      <button class="login-button" @click="handleLogin">登录</button>
+      <button class="login-button" @click="handleLogin" :disabled="isLoading">
+        {{ isLoading ? '登录中...' : '登录' }}
+      </button>
+      <div v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
       <div class="register-link">
         还没有账号？<router-link to="/register">立即注册</router-link>
       </div>
@@ -19,28 +24,40 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+
 const username = ref('')
 const password = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
 
 const handleLogin = async () => {
+  if (!username.value || !password.value) {
+    errorMessage.value = '请输入用户名和密码'
+    return
+  }
+
+  isLoading.value = true
+  errorMessage.value = ''
+
   try {
-    const response = await axios.post('/api/user/login', {
+    const result = await userStore.login({
       username: username.value,
       password: password.value
     })
     
-    if (response.data.code === 0) {
-      localStorage.setItem('gigaLikeUserId', response.data.data.id)
-      localStorage.setItem('gigaLikeUser', JSON.stringify(response.data.data))
+    if (result.success) {
       router.push('/')
     } else {
-      alert(response.data.message || '登录失败')
+      errorMessage.value = result.message
     }
   } catch (error) {
-    alert('登录失败，请稍后重试')
+    errorMessage.value = '登录失败，请稍后重试'
+  } finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -95,10 +112,23 @@ input:focus {
   font-size: 16px;
   cursor: pointer;
   margin-bottom: 20px;
+  transition: background-color 0.2s ease;
 }
 
-.login-button:hover {
+.login-button:hover:not(:disabled) {
   background: #ff1a1a;
+}
+
+.login-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff2442;
+  text-align: center;
+  margin-bottom: 15px;
+  font-size: 14px;
 }
 
 .register-link {

@@ -31,6 +31,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../services/api'
 import BlogContent from '../components/BlogContent.vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   id: { // Received from router path: '/blog/:id'
@@ -40,6 +41,7 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const userStore = useUserStore()
 const blog = ref(null)
 const isLoading = ref(true)
 const error = ref('')
@@ -68,7 +70,7 @@ const fetchBlogDetails = async () => {
 }
 
 const handleLike = async () => {
-  if (!localStorage.getItem('gigaLikeUserId')) {
+  if (!userStore.isLoggedIn) {
     likeError.value = 'You must be logged in to like a post.';
     return;
   }

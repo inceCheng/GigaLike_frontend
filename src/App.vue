@@ -54,7 +54,7 @@
           </div>
           <div 
             class="nav-item" 
-            v-if="!loggedInState" 
+            v-if="!userStore.isLoggedIn" 
             :class="{ active: route.path === '/login' }"
             @click="router.push('/login')"
           >
@@ -66,7 +66,7 @@
             class="nav-item" 
             :class="{ active: route.path === '/profile' }"
             @click="router.push('/profile')"
-            v-if="loggedInState"
+            v-if="userStore.isLoggedIn"
           >
             <i class="nav-icon fa-solid fa-user"></i>
             <span>我</span>
@@ -93,24 +93,19 @@
 
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
-import { ref, watch, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Modal, message } from 'ant-design-vue'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
-
-// Basic auth state management (replace with Pinia or Vuex for larger apps)
-const getCurrentUserId = () => localStorage.getItem('gigaLikeUserId')
-const isLoggedIn = () => !!localStorage.getItem('gigaLikeUserId')
-
-// Reactive variable to trigger re-render on login/logout
-const loggedInState = ref(isLoggedIn())
+const userStore = useUserStore()
 
 const showUserMenu = ref(false)
 const showLoginHover = ref(false)
 
 const handleUserClick = (event) => {
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     router.push('/login')
     return
   }
@@ -130,17 +125,9 @@ const handleLogout = async () => {
     },
     async onOk() {
       try {
-        const response = await fetch('/api/user/logout', {
-          method: 'GET',
-          credentials: 'include'
-        })
-        const data = await response.json()
-        if (data.code === 0) {
-          localStorage.removeItem('gigaLikeUserId')
-          loggedInState.value = false
-          router.push('/')
-          message.success('已成功退出登录')
-        }
+        await userStore.logout()
+        router.push('/')
+        message.success('已成功退出登录')
       } catch (error) {
         console.error('登出失败:', error)
         message.error('退出登录失败，请稍后重试')
@@ -149,27 +136,11 @@ const handleLogout = async () => {
   })
 }
 
-// Watch route changes to update login state if needed (e.g., after login redirect)
 onMounted(() => {
-  loggedInState.value = isLoggedIn();
   document.addEventListener('click', () => {
     showUserMenu.value = false
   })
 });
-
-watch(
-  () => route.path,
-  () => {
-    loggedInState.value = isLoggedIn();
-  }
-);
-
-// 监听登录状态变化
-watch(loggedInState, (newValue) => {
-  if (!newValue && route.path !== '/login' && route.path !== '/') {
-    router.push('/')
-  }
-})
 
 </script>
 

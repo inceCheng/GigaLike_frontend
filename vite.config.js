@@ -21,7 +21,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to backend during development
       '/api': {
-        target: 'http://localhost:8124', // Your backend server address
+        target: 'http://localhost:8123', // Your backend server address
         changeOrigin: true,
       }
     }

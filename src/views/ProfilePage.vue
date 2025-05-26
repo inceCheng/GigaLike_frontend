@@ -136,11 +136,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import axios from 'axios'
+import { useUserStore } from '@/stores/user'
+import apiClient from '@/services/axios'
 
 const router = useRouter()
 const route = useRoute()
-const userInfo = ref({})
+const userStore = useUserStore()
+
 const userPosts = ref([])
 const showEditModal = ref(false)
 const isLoading = ref(true)
@@ -164,9 +166,11 @@ const editForm = ref({
 })
 
 const isCurrentUser = computed(() => {
-  const currentUserId = localStorage.getItem('gigaLikeUserId')
-  return currentUserId === userInfo.value.id?.toString()
+  return userStore.getCurrentUserId === userStore.user?.id
 })
+
+// 使用store中的用户信息
+const userInfo = computed(() => userStore.user || {})
 
 onMounted(async () => {
   await loadUserInfo()
@@ -176,28 +180,29 @@ onMounted(async () => {
 const loadUserInfo = async () => {
   isLoading.value = true
   error.value = null
-  isImageLoading.value = true // Reset image loading state
+  isImageLoading.value = true
+  
   try {
-    const response = await axios.get('/api/user/current')
-    if (response.data.code === 0) {
-      userInfo.value = response.data.data
+    // 验证session并获取最新用户信息
+    const isValid = await userStore.validateSession()
+    if (isValid && userStore.user) {
       editForm.value = {
-        displayName: userInfo.value.displayName || '',
-        bio: userInfo.value.bio || '',
-        avatarUrl: userInfo.value.avatarUrl || '',
-        email: userInfo.value.email || ''
+        displayName: userStore.user.displayName || '',
+        bio: userStore.user.bio || '',
+        avatarUrl: userStore.user.avatarUrl || '',
+        email: userStore.user.email || ''
       }
-      // If no avatar URL is provided, immediately hide the loading spinner
-      if (!userInfo.value.avatarUrl) {
+      
+      if (!userStore.user.avatarUrl) {
         isImageLoading.value = false
       }
     } else {
-      throw new Error(response.data.message || '加载用户信息失败')
+      throw new Error('用户信息加载失败')
     }
   } catch (err) {
     error.value = err.message || '加载用户信息失败，请稍后重试'
     console.error('Failed to load user info:', err)
-    isImageLoading.value = false // Hide loading spinner on error
+    isImageLoading.value = false
   } finally {
     isLoading.value = false
   }
@@ -207,7 +212,7 @@ const loadUserPosts = async () => {
   isPostsLoading.value = true
   postsError.value = null
   try {
-    const response = await axios.get('/api/user/blogs', {
+    const response = await apiClient.get('/user/blogs', {
       params: {
         current: currentPage.value,
         pageSize: pageSize.value
@@ -254,16 +259,15 @@ const handleCloseModal = () => {
 const handleSaveProfile = async () => {
   isSaving.value = true
   try {
-    const response = await axios.post('/api/user/update', editForm.value)
-    if (response.data.code === 0) {
-      userInfo.value = response.data.data
+    const result = await userStore.updateUserInfo(editForm.value)
+    if (result.success) {
       showEditModal.value = false
       message.success({
         content: '保存成功！',
         duration: 2,
       })
     } else {
-      throw new Error(response.data.message || '保存失败')
+      throw new Error(result.message || '保存失败')
     }
   } catch (error) {
     message.error({
@@ -293,10 +297,12 @@ const confirmLogout = () => {
 
 const handleLogout = async () => {
   try {
-    await axios.get('/api/user/logout')
-    localStorage.removeItem('gigaLikeUserId')
-    localStorage.removeItem('gigaLikeUser')
+    await userStore.logout()
     router.push('/login')
+    message.success({
+      content: '已成功退出登录',
+      duration: 2,
+    })
   } catch (error) {
     console.error('Logout failed:', error)
     message.error({
