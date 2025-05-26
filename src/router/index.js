@@ -4,7 +4,7 @@ import LoginPage from '../views/LoginPage.vue'
 import RegisterPage from '../views/RegisterPage.vue'
 import ProfilePage from '../views/ProfilePage.vue'
 import BlogDetailView from '../views/BlogDetailView.vue'
-import Discover from '../views/Discover.vue'
+import CreatePostPage from '../views/CreatePostPage.vue'
 import Messages from '../views/Messages.vue'
 import { useUserStore } from '@/stores/user'
 
@@ -55,9 +55,9 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/discover',
-    name: 'Discover',
-    component: Discover,
+    path: '/create',
+    name: 'CreatePost',
+    component: CreatePostPage,
     meta: { requiresAuth: true }
   },
   {

@@ -18,7 +18,7 @@
         </div>
         
         <div class="nav-actions">
-          <button class="create-btn">
+          <button class="create-btn" @click="router.push('/create')" v-if="userStore.isLoggedIn">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
         </div>
@@ -38,11 +38,11 @@
           </div>
           <div 
             class="nav-item" 
-            :class="{ active: route.path === '/discover' }"
-            @click="router.push('/discover')"
+            :class="{ active: route.path === '/create' }"
+            @click="router.push('/create')"
           >
-            <i class="nav-icon fa-solid fa-compass"></i>
-            <span>发现</span>
+            <i class="nav-icon fa-solid fa-pen-to-square"></i>
+            <span>发布</span>
           </div>
           <div 
             class="nav-item" 

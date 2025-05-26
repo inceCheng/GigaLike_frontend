@@ -10,6 +10,9 @@ export default {
   getBlogDetails(blogId) {
     return apiClient.get(`/blog/get?blogId=${blogId}`);
   },
+  createBlog(blogData) {
+    return apiClient.post('/blog/create', blogData);
+  },
   doThumb(blogId) {
     return apiClient.post('/thumb/do', { blogId: parseInt(blogId) });
   },
