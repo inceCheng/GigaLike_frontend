@@ -14,8 +14,18 @@
       <p class="blog-card-excerpt">{{ truncateContent(blog.content) }}</p>
       <div class="blog-card-footer">
         <div class="blog-card-user">
-          <div class="user-avatar"></div>
-          <span class="user-name">用户{{ Math.floor(Math.random() * 1000) }}</span>
+          <div class="user-avatar">
+            <img 
+              v-if="blog.author && blog.author.avatarUrl" 
+              :src="blog.author.avatarUrl" 
+              :alt="blog.author.displayName || blog.author.username"
+              class="avatar-img"
+            />
+            <i v-else class="fa-solid fa-user avatar-icon"></i>
+          </div>
+          <span class="user-name">
+            {{ blog.author ? (blog.author.displayName || blog.author.username) : '匿名用户' }}
+          </span>
         </div>
         <div class="blog-card-interactions">
           <span class="interaction-item">
@@ -164,15 +174,33 @@ const formatLikes = (count) => {
   border-radius: 50%;
   background-color: #f0f0f0;
   margin-right: 6px;
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cccccc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>');
-  background-size: 70%;
-  background-position: center;
-  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-icon {
+  color: #cccccc;
+  font-size: 10px;
 }
 
 .user-name {
   font-size: 0.75rem;
   color: #666;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80px;
 }
 
 .blog-card-interactions {
