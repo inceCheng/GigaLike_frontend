@@ -1,6 +1,7 @@
 <template>
   <div id="app-container">
-    <header class="app-header">
+    <!-- 只在非隐藏布局的页面显示导航栏 -->
+    <header class="app-header" v-if="!route.meta.hideLayout">
       <div class="header-content">
         <div class="logo">
           <!-- <img src="/logo.png" alt="GigaLike Logo" /> -->
@@ -25,8 +26,10 @@
       </div>
     </header>
     
-    <main class="app-main">
-      <aside class="sidebar">
+    <!-- 主要内容区域 -->
+    <main class="app-main" :class="{ 'full-screen': route.meta.hideLayout }">
+      <!-- 只在非隐藏布局的页面显示侧边栏 -->
+      <aside class="sidebar" v-if="!route.meta.hideLayout">
         <nav class="sidebar-nav">
           <div 
             class="nav-item" 
@@ -74,12 +77,13 @@
         </nav>
       </aside>
       
-      <div class="content-container">
+      <div class="content-container" :class="{ 'full-width': route.meta.hideLayout }">
         <router-view />
       </div>
     </main>
     
-    <footer class="app-footer">
+    <!-- 只在非隐藏布局的页面显示页脚 -->
+    <footer class="app-footer" v-if="!route.meta.hideLayout">
       <p>© 2024 GigaLike. All rights reserved.</p>
       <div class="footer-links">
         <a href="#">关于我们</a>
@@ -275,10 +279,21 @@ body {
 
 .app-main {
   display: flex;
-  flex-grow: 1;
+  flex: 1;
+  min-height: 0;
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
+  position: relative;
+  overflow-y: auto;
+}
+
+.app-main.full-screen {
+  display: block;
+  width: 100%;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
 }
 
 .sidebar {
@@ -286,6 +301,12 @@ body {
   padding: 1rem 0;
   background-color: #fff;
   border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  position: fixed;
+  top: 70px; /* 调整到顶部导航栏下方 */
+  left: calc(50% - 600px); /* 居中对齐，保持在原位置 */
+  height: calc(100vh - 70px); /* 调整高度，减去顶部导航栏高度 */
+  z-index: 50;
 }
 
 .sidebar-nav {
@@ -321,23 +342,24 @@ body {
   color: var(--primary-color);
 }
 
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  background-color: var(--secondary-color);
-  border-radius: 12px;
-  z-index: -1;
-  top: 8px;
+.nav-item.active .nav-icon {
+  color: var(--primary-color);
+  transform: scale(1.1); /* 激活时图标稍微放大 */
+}
+
+/* 移除背景高亮，改为图标颜色高亮 */
+
+.nav-item.active .nav-icon {
+  color: var(--primary-color);
+  transform: scale(1.1); /* 激活时图标稍微放大 */
 }
 
 .nav-icon {
-  font-size: 1.5rem;
+  font-size: 1.8rem; /* 调大图标尺寸 */
   margin-bottom: 8px;
   position: relative;
   z-index: 1;
-  transition: transform 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .nav-item span {
@@ -346,8 +368,16 @@ body {
 }
 
 .content-container {
-  flex-grow: 1;
-  padding: 1rem;
+  flex: 1;
+  padding: 0 1rem;
+  background-color: #fff;
+  margin-left: 100px; /* 为固定侧边栏留出空间 */
+}
+
+.content-container.full-width {
+  padding: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .app-footer {

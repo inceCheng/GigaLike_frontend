@@ -185,16 +185,14 @@ onMounted(async () => {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  padding-top: 0; /* 确保顶部没有额外间距 */
 }
 
 /* 顶部标签导航栏 */
 .categories-container {
-  position: sticky;
-  top: 60px; /* 顶部导航栏高度 */
   background-color: #fff;
-  padding: 0.8rem 0;
-  margin-bottom: 1rem;
-  z-index: 10;
+  padding: 0.4rem 0;
+  margin-bottom: 0.3rem;
   border-bottom: 1px solid var(--border-color);
 }
 

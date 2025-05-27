@@ -19,6 +19,10 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: LoginPage,
+    meta: { 
+      hideNavigation: true,
+      hideLayout: true 
+    },
     beforeEnter: (to, from, next) => {
       const userStore = useUserStore()
       if (userStore.isLoggedIn) {
@@ -32,6 +36,10 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: RegisterPage,
+    meta: { 
+      hideNavigation: true,
+      hideLayout: true 
+    },
     beforeEnter: (to, from, next) => {
       const userStore = useUserStore()
       if (userStore.isLoggedIn) {
