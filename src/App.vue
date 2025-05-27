@@ -71,7 +71,15 @@
             @click="router.push('/profile')"
             v-if="userStore.isLoggedIn"
           >
-            <i class="nav-icon fa-solid fa-user"></i>
+            <div class="nav-avatar-container">
+              <img 
+                :src="userStore.user?.avatarUrl ? `${userStore.user.avatarUrl}?v=${userStore.avatarVersion}` : '/images/default-avatar.png'" 
+                alt="我的头像"
+                class="nav-avatar"
+                :key="`${userStore.user?.avatarUrl}-${userStore.avatarVersion}`"
+                @error="handleNavAvatarError"
+              />
+            </div>
             <span>我</span>
           </div>
         </nav>
@@ -97,7 +105,7 @@
 
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 
@@ -139,6 +147,31 @@ const handleLogout = async () => {
     }
   })
 }
+
+const handleNavAvatarError = (event) => {
+  event.target.src = '/images/default-avatar.png'
+}
+
+const getAvatarUrl = (avatarUrl) => {
+  if (!avatarUrl) {
+    return '/images/default-avatar.png'
+  }
+  // 使用头像版本号避免缓存
+  return `${avatarUrl}?v=${userStore.avatarVersion}`
+}
+
+// 监听头像版本号变化，强制更新头像
+watch(() => userStore.avatarVersion, async (newVersion) => {
+  if (userStore.user?.avatarUrl) {
+    await nextTick()
+    // 强制更新所有头像元素
+    const avatarElements = document.querySelectorAll('.nav-avatar')
+    avatarElements.forEach(img => {
+      const baseUrl = userStore.user.avatarUrl
+      img.src = `${baseUrl}?v=${newVersion}`
+    })
+  }
+})
 
 onMounted(() => {
   document.addEventListener('click', () => {
@@ -360,6 +393,38 @@ body {
   position: relative;
   z-index: 1;
   transition: all 0.2s ease;
+}
+
+/* 导航栏头像样式 */
+.nav-avatar-container {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+  transition: all 0.2s ease;
+}
+
+.nav-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.nav-item:hover .nav-avatar-container {
+  transform: scale(1.1);
+}
+
+.nav-item.active .nav-avatar {
+  border-color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.nav-item:hover .nav-avatar {
+  border-color: var(--primary-color);
 }
 
 .nav-item span {

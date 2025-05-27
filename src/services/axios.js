@@ -13,7 +13,8 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // 处理大整数精度问题：确保大整数以字符串形式发送
-    if (config.data && typeof config.data === 'object') {
+    // 但是跳过FormData对象，因为它们不需要JSON序列化
+    if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
       config.data = JSON.parse(JSON.stringify(config.data, (key, value) => {
         // 如果是数字且超过安全整数范围，转换为字符串
         if (typeof value === 'number' && (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)) {

@@ -15,7 +15,7 @@
       <div class="user-info">
         <div class="avatar-container">
           <img 
-            :src="userInfo.avatarUrl || '/images/default-avatar.png'" 
+            :src="getAvatarUrl(userInfo.avatarUrl)" 
             class="avatar"
             @error="handleImageError"
             @load="handleImageLoad"
@@ -83,6 +83,39 @@
     <div class="edit-modal" v-if="showEditModal" @click.self="handleCloseModal">
       <div class="modal-content">
         <h2>编辑资料</h2>
+        
+        <!-- 头像上传区域 - 移到顶部 -->
+        <div class="avatar-section">
+          <div class="avatar-upload-container">
+            <div class="avatar-preview" :class="{ uploading: isAvatarUploading }" @click="selectAvatarFile">
+              <img 
+                :src="getAvatarUrl(editForm.avatarUrl)" 
+                alt="头像预览"
+                class="preview-image"
+              />
+              <div class="upload-overlay">
+                <i class="fa-solid fa-camera"></i>
+                <span>点击上传头像</span>
+              </div>
+              <div class="upload-progress" v-if="isAvatarUploading">
+                <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+              </div>
+            </div>
+            <input
+              ref="avatarFileInput"
+              type="file"
+              accept="image/*"
+              style="display: none"
+              @change="handleAvatarFileSelect"
+            />
+            <div class="upload-tips">
+              <p>支持 JPG、PNG、GIF、WebP 格式</p>
+              <p>文件大小不超过 5MB</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 表单字段 -->
         <div class="form-group">
           <label>昵称</label>
           <input 
@@ -101,22 +134,6 @@
           ></textarea>
           <span class="char-count">{{ editForm.bio.length }}/200</span>
         </div>
-        <div class="form-group">
-          <label>头像链接</label>
-          <input 
-            type="text" 
-            v-model="editForm.avatarUrl" 
-            placeholder="请输入头像图片链接"
-          />
-        </div>
-        <div class="form-group">
-          <label>邮箱</label>
-          <input 
-            type="email" 
-            v-model="editForm.email" 
-            placeholder="请输入邮箱"
-          />
-        </div>
         <div class="modal-buttons">
           <button 
             @click="handleSaveProfile" 
@@ -133,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
@@ -152,6 +169,9 @@ const postsError = ref(null)
 const isImageLoading = ref(true)
 const loadingPosts = ref({})
 const isSaving = ref(false)
+const isAvatarUploading = ref(false)
+const uploadProgress = ref(0)
+const avatarFileInput = ref(null)
 
 // Add pagination related refs
 const currentPage = ref(1)
@@ -161,8 +181,7 @@ const total = ref(0)
 const editForm = ref({
   displayName: '',
   bio: '',
-  avatarUrl: '',
-  email: ''
+  avatarUrl: ''
 })
 
 const isCurrentUser = computed(() => {
@@ -189,8 +208,7 @@ const loadUserInfo = async () => {
       editForm.value = {
         displayName: userStore.user.displayName || '',
         bio: userStore.user.bio || '',
-        avatarUrl: userStore.user.avatarUrl || '',
-        email: userStore.user.email || ''
+        avatarUrl: userStore.user.avatarUrl || ''
       }
       
       if (!userStore.user.avatarUrl) {
@@ -262,6 +280,12 @@ const handleSaveProfile = async () => {
     const result = await userStore.updateUserInfo(editForm.value)
     if (result.success) {
       showEditModal.value = false
+      
+      // 如果头像有更新，强制刷新所有头像显示
+      if (editForm.value.avatarUrl && userStore.user?.avatarUrl) {
+        userStore.updateAvatarVersion()
+      }
+      
       message.success({
         content: '保存成功！',
         duration: 2,
@@ -321,6 +345,14 @@ const goToPost = (postId) => {
   router.push(`/blog/${postId}`)
 }
 
+const getAvatarUrl = (avatarUrl) => {
+  if (!avatarUrl) {
+    return '/images/default-avatar.png'
+  }
+  // 使用头像版本号避免缓存
+  return `${avatarUrl}?v=${userStore.avatarVersion}`
+}
+
 // Add load more function
 const loadMore = async () => {
   if (userPosts.value.length >= total.value) {
@@ -328,6 +360,170 @@ const loadMore = async () => {
   }
   currentPage.value++
   await loadUserPosts()
+}
+
+// 头像上传相关方法
+const selectAvatarFile = () => {
+  if (!isAvatarUploading.value) {
+    avatarFileInput.value?.click()
+  }
+}
+
+const handleAvatarFileSelect = (event) => {
+  const file = event.target.files[0]
+  console.log('文件选择事件:', event.target.files)
+  console.log('选择的文件:', file)
+  
+  if (file) {
+    // 验证文件是否为有效的File对象
+    if (file instanceof File) {
+      console.log('文件验证通过，开始上传')
+      uploadAvatar(file)
+    } else {
+      console.error('选择的不是有效的文件对象:', file)
+      message.error('请选择有效的文件')
+    }
+  } else {
+    console.log('没有选择文件')
+  }
+}
+
+const validateAvatarFile = (file) => {
+  // 文件类型验证
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowedTypes.includes(file.type)) {
+    message.error('不支持的文件格式，请选择 JPG、PNG、GIF 或 WebP 格式的图片')
+    return false
+  }
+
+  // 文件大小验证
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  if (file.size > maxSize) {
+    message.error('文件大小不能超过 5MB')
+    return false
+  }
+
+  return true
+}
+
+const uploadAvatar = async (file) => {
+  if (!validateAvatarFile(file)) {
+    return
+  }
+
+  // 验证文件对象
+  if (!file || !(file instanceof File)) {
+    message.error('请选择有效的文件')
+    return
+  }
+
+  console.log('准备上传文件:', {
+    name: file.name,
+    size: file.size,
+    type: file.type
+  })
+
+  isAvatarUploading.value = true
+  uploadProgress.value = 0
+
+  try {
+    // 创建FormData
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // 验证FormData内容
+    console.log('FormData内容:')
+    for (let [key, value] of formData.entries()) {
+      console.log(key, value)
+    }
+
+    // 上传头像文件 - 不设置Content-Type，让浏览器自动设置
+    const response = await apiClient.post('/file/upload/avatar', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          uploadProgress.value = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          )
+        }
+      }
+    })
+
+    console.log('上传响应:', response.data)
+
+    if (response.data.code === 0) {
+      // 更新表单中的头像URL
+      editForm.value.avatarUrl = response.data.data
+      
+      // 头像上传成功后，获取最新用户信息并同步localStorage
+      try {
+        // 等待一下，确保后端数据已经更新
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        const userResponse = await apiClient.get('/user/current')
+        
+        if (userResponse.data.code === 0) {
+          const newAvatarUrl = userResponse.data.data.avatarUrl
+          const uploadedAvatarUrl = response.data.data
+          
+          if (newAvatarUrl === uploadedAvatarUrl) {
+            // 后端数据已更新，使用后端返回的用户信息
+            userStore.setUser(userResponse.data.data)
+          } else {
+            // 后端数据未更新，手动更新头像URL
+            const updatedUser = {
+              ...userResponse.data.data,
+              avatarUrl: uploadedAvatarUrl
+            }
+            userStore.setUser(updatedUser)
+          }
+          
+          // 更新头像版本号，强制刷新所有头像
+          userStore.updateAvatarVersion()
+          message.success('头像上传成功')
+        } else {
+          throw new Error('获取最新用户信息失败')
+        }
+      } catch (syncError) {
+        console.error('同步用户信息失败:', syncError)
+        // 如果同步失败，手动更新本地状态
+        if (userStore.user) {
+          const updatedUser = {
+            ...userStore.user,
+            avatarUrl: response.data.data
+          }
+          userStore.setUser(updatedUser)
+          userStore.updateAvatarVersion()
+        }
+        message.success('头像上传成功')
+      }
+    } else {
+      throw new Error(response.data.message || '头像上传失败')
+    }
+  } catch (error) {
+    console.error('头像上传失败:', error)
+    
+    // 更详细的错误信息
+    let errorMessage = '头像上传失败，请稍后重试'
+    if (error.response) {
+      console.error('响应错误:', error.response.data)
+      errorMessage = error.response.data.message || errorMessage
+    } else if (error.request) {
+      console.error('请求错误:', error.request)
+      errorMessage = '网络请求失败，请检查网络连接'
+    } else {
+      console.error('其他错误:', error.message)
+      errorMessage = error.message || errorMessage
+    }
+    
+    message.error(errorMessage)
+  } finally {
+    isAvatarUploading.value = false
+    uploadProgress.value = 0
+    // 清空文件输入框
+    if (avatarFileInput.value) {
+      avatarFileInput.value.value = ''
+    }
+  }
 }
 </script>
 
@@ -646,6 +842,105 @@ const loadMore = async () => {
   background: #ff1a1a;
 }
 
+/* 头像区域样式 */
+.avatar-section {
+  text-align: center;
+  padding: 20px 0;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* 头像上传样式 */
+.avatar-upload-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar-preview {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid #f0f0f0;
+  transition: border-color 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-preview:hover {
+  border-color: #ff2442;
+}
+
+.avatar-preview.uploading {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-size: 12px;
+  text-align: center;
+}
+
+.avatar-preview:hover .upload-overlay {
+  opacity: 1;
+}
+
+.upload-overlay i {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.upload-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #ff2442;
+  transition: width 0.3s ease;
+  border-radius: 2px;
+}
+
+.upload-tips {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.upload-tips p {
+  margin: 2px 0;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .profile-container {
@@ -679,6 +974,25 @@ const loadMore = async () => {
   .modal-content {
     padding: 20px;
     width: 95%;
+  }
+
+  .avatar-section {
+    padding: 15px 0;
+    margin-bottom: 20px;
+  }
+
+  .avatar-preview {
+    width: 120px;
+    height: 120px;
+  }
+
+  .upload-overlay {
+    font-size: 10px;
+  }
+
+  .upload-overlay i {
+    font-size: 20px;
+    margin-bottom: 6px;
   }
 }
 

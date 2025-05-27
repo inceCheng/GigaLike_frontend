@@ -5,6 +5,7 @@ import apiClient from '@/services/axios'
 export const useUserStore = defineStore('user', () => {
   // 状态
   const user = ref(null)
+  const avatarVersion = ref(Date.now()) // 头像版本号，用于强制刷新
   const isLoggedIn = computed(() => !!user.value)
   
   // 从localStorage初始化用户状态
@@ -100,6 +101,10 @@ export const useUserStore = defineStore('user', () => {
       const response = await apiClient.post('/user/update', updateData)
       
       if (response.data.code === 0) {
+        // 如果更新了头像，更新版本号
+        if (updateData.avatarUrl && updateData.avatarUrl !== user.value?.avatarUrl) {
+          avatarVersion.value = Date.now()
+        }
         setUser(response.data.data)
         return { success: true, data: response.data.data }
       } else {
@@ -111,6 +116,11 @@ export const useUserStore = defineStore('user', () => {
     }
   }
   
+  // 更新头像版本号（用于强制刷新头像）
+  const updateAvatarVersion = () => {
+    avatarVersion.value = Date.now()
+  }
+  
   // 获取当前用户ID
   const getCurrentUserId = computed(() => {
     return user.value?.id || null
@@ -119,6 +129,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     // 状态
     user,
+    avatarVersion,
     isLoggedIn,
     getCurrentUserId,
     
@@ -129,6 +140,7 @@ export const useUserStore = defineStore('user', () => {
     login,
     logout,
     validateSession,
-    updateUserInfo
+    updateUserInfo,
+    updateAvatarVersion
   }
 }) 
