@@ -11,8 +11,14 @@
         
         <div class="search-container">
           <div class="search-wrapper">
-            <input type="text" placeholder="搜索" class="search-input" />
-            <button class="search-button">
+            <input 
+              type="text" 
+              placeholder="搜索 GigaLike..." 
+              class="search-input"
+              v-model="searchKeyword"
+              @keyup.enter="handleSearch"
+            />
+            <button class="search-button" @click="handleSearch">
               <i class="fa-solid fa-magnifying-glass"></i>
             </button>
           </div>
@@ -115,6 +121,7 @@ const userStore = useUserStore()
 
 const showUserMenu = ref(false)
 const showLoginHover = ref(false)
+const searchKeyword = ref('')
 
 const handleUserClick = (event) => {
   if (!userStore.isLoggedIn) {
@@ -160,6 +167,31 @@ const getAvatarUrl = (avatarUrl) => {
   return `${avatarUrl}?v=${userStore.avatarVersion}`
 }
 
+const handleSearch = () => {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    message.warning('请输入搜索关键词')
+    return
+  }
+  
+  // 如果当前不在首页，先跳转到首页
+  if (route.path !== '/') {
+    router.push({
+      path: '/',
+      query: { search: keyword }
+    })
+  } else {
+    // 如果已经在首页，直接触发搜索
+    router.push({
+      path: '/',
+      query: { search: keyword }
+    })
+  }
+  
+  // 清空搜索框
+  searchKeyword.value = ''
+}
+
 // 监听头像版本号变化，强制更新头像
 watch(() => userStore.avatarVersion, async (newVersion) => {
   if (userStore.user?.avatarUrl) {
@@ -183,10 +215,10 @@ onMounted(() => {
 
 <style>
 :root {
-  --primary-color: #ff2e51;
+  --primary-color: #fe2c55;
   --secondary-color: #ffd6e0;
   --text-color: #333;
-  --light-gray: #f4f4f4;
+  --light-gray: #f5f5f5;
   --border-color: #e8e8e8;
 }
 
@@ -243,23 +275,39 @@ body {
   flex: 1;
   display: flex;
   justify-content: center;
+  max-width: 600px;
 }
 
 .search-wrapper {
   position: relative;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
   display: flex;
   align-items: center;
 }
 
 .search-input {
   width: 100%;
-  padding: 0.6rem 1rem;
+  height: 40px;
+  padding: 0 40px 0 16px;
   border-radius: 20px;
-  border: 1px solid var(--border-color);
-  background-color: var(--light-gray);
-  font-size: 0.9rem;
+  border: none;
+  background-color: #f5f5f5;
+  font-size: 14px;
+  color: #333;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.search-input:focus {
+  background-color: #fff;
+  box-shadow: 0 0 0 1px #fe2c55;
+}
+
+.search-input::placeholder {
+  color: #999;
+  font-weight: 400;
 }
 
 .search-button {
@@ -267,23 +315,25 @@ body {
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  background-color: #f5f5f5;
-  color: #666;
+  background: none;
+  color: #999;
   border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 .search-button:hover {
-  background-color: #e8e8e8;
-  color: #333;
+  color: #fe2c55;
+}
+
+.search-button i {
+  font-size: 16px;
 }
 
 .search-icon {
@@ -491,5 +541,47 @@ body {
 :deep(.custom-modal .ant-btn-default:hover) {
   color: var(--primary-color);
   border-color: var(--primary-color);
+}
+
+/* 移动端响应式优化 */
+@media (max-width: 768px) {
+  .header-content {
+    padding: 0 12px;
+  }
+  
+  .logo {
+    width: 80px;
+    font-size: 1.2rem;
+  }
+  
+  .search-container {
+    max-width: none;
+    margin: 0 12px;
+  }
+  
+  .search-wrapper {
+    max-width: none;
+  }
+  
+  .search-input {
+    height: 36px;
+    padding: 0 36px 0 12px;
+    font-size: 14px;
+    border-radius: 18px;
+  }
+  
+  .search-button {
+    width: 20px;
+    height: 20px;
+    right: 8px;
+  }
+  
+  .search-button i {
+    font-size: 14px;
+  }
+  
+  .nav-actions {
+    width: 60px;
+  }
 }
 </style> 

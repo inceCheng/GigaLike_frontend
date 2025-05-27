@@ -44,5 +44,9 @@ export default {
   },
   getTopicDetails(topicId) {
     return apiClient.get(`/topic/get?topicId=${String(topicId)}`);
+  },
+  // 搜索博客
+  searchBlogs(searchParams) {
+    return apiClient.post('/blog/search', searchParams);
   }
 }; 

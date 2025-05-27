@@ -1,7 +1,19 @@
 <template>
   <div class="home-container">
+    <!-- 搜索结果提示 -->
+    <div v-if="isSearchMode" class="search-result-header">
+      <div class="search-info">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>搜索结果：{{ searchKeyword }}</span>
+        <button class="clear-search-btn" @click="clearSearch">
+          <i class="fa-solid fa-times"></i>
+          清除搜索
+        </button>
+      </div>
+    </div>
+
     <!-- 顶部标签导航栏 -->
-    <div class="categories-container">
+    <div class="categories-container" v-if="!isSearchMode">
       <div class="categories-wrapper">
         <div 
           class="category-item" 
@@ -31,7 +43,10 @@
         </div>
         
         <div v-else-if="blogs.length === 0" class="empty-container">
-          <p>{{ selectedTopicId ? '该话题下暂无博客内容' : '暂无博客内容' }}</p>
+          <p>
+            {{ isSearchMode ? `没有找到与"${searchKeyword}"相关的内容` : 
+               selectedTopicId ? '该话题下暂无博客内容' : '暂无博客内容' }}
+          </p>
           <button @click="fetchBlogs" class="refresh-btn">刷新</button>
         </div>
         
@@ -46,16 +61,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import api from '../services/api'
 import BlogCard from '../components/BlogCard.vue'
 
 const router = useRouter()
+const route = useRoute()
 const blogs = ref([])
 const hotTopics = ref([])
 const loading = ref(true)
 const selectedTopicId = ref(null)
+const searchKeyword = ref('')
+const isSearchMode = ref(false)
 
 // 模拟数据，当后端API没有实现时使用
 const mockBlogs = [
@@ -133,19 +151,40 @@ const loadHotTopics = async () => {
 const fetchBlogs = async () => {
   loading.value = true
   try {
-    // 根据选中的话题ID获取博客列表
-    const response = await api.getBlogs(selectedTopicId.value)
-    if (response.data && response.data.code === 0 && response.data.data) {
-      blogs.value = response.data.data
-      console.log('博客列表加载成功:', blogs.value.length, '篇博客')
+    let response
+    
+    if (isSearchMode.value && searchKeyword.value) {
+      // 搜索模式
+      response = await api.searchBlogs({
+        keyword: searchKeyword.value,
+        current: 1,
+        pageSize: 20,
+        sortField: 'createTime',
+        sortOrder: 'desc'
+      })
+      
+      if (response.data && response.data.code === 0 && response.data.data) {
+        blogs.value = response.data.data.records || []
+        console.log('搜索结果加载成功:', blogs.value.length, '篇博客')
+      } else {
+        console.warn('搜索响应异常:', response.data)
+        blogs.value = []
+      }
     } else {
-      console.warn('博客列表响应异常:', response.data)
-      blogs.value = []
+      // 正常模式：根据选中的话题ID获取博客列表
+      response = await api.getBlogs(selectedTopicId.value)
+      if (response.data && response.data.code === 0 && response.data.data) {
+        blogs.value = response.data.data
+        console.log('博客列表加载成功:', blogs.value.length, '篇博客')
+      } else {
+        console.warn('博客列表响应异常:', response.data)
+        blogs.value = []
+      }
     }
   } catch (error) {
     console.error('获取博客列表失败:', error)
-    // API 请求失败时，使用模拟数据（仅在推荐页面）
-    if (selectedTopicId.value === null) {
+    // API 请求失败时，使用模拟数据（仅在推荐页面且非搜索模式）
+    if (selectedTopicId.value === null && !isSearchMode.value) {
       blogs.value = mockBlogs
     } else {
       blogs.value = []
@@ -156,12 +195,21 @@ const fetchBlogs = async () => {
 }
 
 const selectTopic = async (topicId) => {
-  if (selectedTopicId.value === topicId) {
-    return // 如果点击的是当前已选中的话题，不做任何操作
+  if (selectedTopicId.value === topicId && !isSearchMode.value) {
+    return // 如果点击的是当前已选中的话题且不在搜索模式，不做任何操作
   }
+  
+  // 退出搜索模式
+  isSearchMode.value = false
+  searchKeyword.value = ''
   
   selectedTopicId.value = topicId
   console.log('选择话题:', topicId === null ? '推荐' : `话题ID: ${topicId}`)
+  
+  // 清除URL中的搜索参数
+  if (route.query.search) {
+    router.replace({ path: '/' })
+  }
   
   // 重新获取博客列表
   await fetchBlogs()
@@ -171,12 +219,53 @@ const viewBlogDetail = (blogId) => {
   router.push({ name: 'BlogDetail', params: { id: blogId } })
 }
 
-onMounted(async () => {
-  // 并行加载热门话题和博客列表
-  await Promise.all([
-    loadHotTopics(),
+// 处理搜索
+const handleSearch = async (keyword) => {
+  if (!keyword || !keyword.trim()) {
+    return
+  }
+  
+  searchKeyword.value = keyword.trim()
+  isSearchMode.value = true
+  selectedTopicId.value = null // 清除话题选择
+  
+  console.log('执行搜索:', searchKeyword.value)
+  await fetchBlogs()
+}
+
+// 清除搜索
+const clearSearch = () => {
+  isSearchMode.value = false
+  searchKeyword.value = ''
+  selectedTopicId.value = null
+  
+  // 清除URL中的搜索参数
+  router.replace({ path: '/' })
+  
+  // 重新加载博客列表
+  fetchBlogs()
+}
+
+// 监听路由查询参数变化
+watch(() => route.query.search, (newSearch) => {
+  if (newSearch) {
+    handleSearch(newSearch)
+  } else if (isSearchMode.value) {
+    // 如果搜索参数被清除，退出搜索模式
+    isSearchMode.value = false
+    searchKeyword.value = ''
     fetchBlogs()
-  ])
+  }
+}, { immediate: true })
+
+onMounted(async () => {
+  // 并行加载热门话题
+  await loadHotTopics()
+  
+  // 如果URL中没有搜索参数，加载博客列表
+  if (!route.query.search) {
+    await fetchBlogs()
+  }
 })
 </script>
 
@@ -186,6 +275,51 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 0 auto;
   padding-top: 0; /* 确保顶部没有额外间距 */
+}
+
+/* 搜索结果头部 */
+.search-result-header {
+  background-color: #fff;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.search-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+}
+
+.search-info i {
+  color: var(--primary-color);
+}
+
+.search-info span {
+  font-weight: 500;
+  color: #333;
+}
+
+.clear-search-btn {
+  margin-left: auto;
+  padding: 0.3rem 0.8rem;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 16px;
+  color: #666;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.clear-search-btn:hover {
+  background: #e8e8e8;
+  color: #333;
 }
 
 /* 顶部标签导航栏 */
