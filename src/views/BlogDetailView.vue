@@ -19,13 +19,13 @@
           />
           <div v-else class="no-image-placeholder">
             <i class="fa-solid fa-image"></i>
-            <p>No Image</p>
+            <p>暂无图片</p>
           </div>
         </div>
 
         <!-- 右侧详情区域 -->
         <div class="blog-content-section">
-          <!-- 作者信息 -->
+          <!-- 作者信息 - 最上方 -->
           <div v-if="blog.author" class="author-info">
             <div class="author-avatar">
               <img
@@ -38,9 +38,14 @@
                 <i class="fa-solid fa-user"></i>
               </div>
             </div>
-            <span class="author-name">
-              {{ blog.author.displayName || blog.author.username }}
-            </span>
+            <div class="author-details">
+              <span class="author-name">
+                {{ blog.author.displayName || blog.author.username }}
+              </span>
+              <span v-if="blog.author.bio" class="author-bio">
+                {{ blog.author.bio }}
+              </span>
+            </div>
           </div>
 
           <!-- 文章标题 -->
@@ -62,7 +67,13 @@
             </span>
           </div>
 
-          <!-- 点赞信息 -->
+          <!-- 发布时间 -->
+          <div class="blog-meta">
+            <i class="fa-regular fa-clock"></i>
+            <span>{{ formatDate(blog.createTime) }}</span>
+          </div>
+
+          <!-- 点赞信息 - 最下方 -->
           <div class="like-section">
             <div class="like-container">
               <button
@@ -77,11 +88,6 @@
               <span class="like-count">{{ blog.thumbCount }}</span>
             </div>
             <p v-if="likeError" class="error-message">{{ likeError }}</p>
-          </div>
-
-          <!-- 创建时间 -->
-          <div class="blog-meta">
-            <span> {{ formatDate(blog.createTime) }}</span>
           </div>
         </div>
       </div>
@@ -178,8 +184,19 @@ const handleLike = async () => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
-  const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-  return new Date(dateString).toLocaleDateString(undefined, options);
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffTime = Math.abs(now - date);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 1) {
+    return '昨天发布';
+  } else if (diffDays < 7) {
+    return `${diffDays}天前发布`;
+  } else {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('zh-CN', options) + ' 发布';
+  }
 }
 
 // 监听用户登录状态变化，重新获取博客详情以更新点赞状态
@@ -197,7 +214,7 @@ onMounted(() => {
 <style scoped>
 .blog-detail-view {
   min-height: 100vh;
-  background-color: #fff;
+  background-color: #ffffff;
 }
 
 .blog-detail-container {
@@ -207,62 +224,367 @@ onMounted(() => {
 }
 
 .back-link {
-  display: inline-block;
-  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 24px;
   color: #007bff;
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 14px;
   transition: color 0.2s ease;
+  padding: 4px 8px;
+  border-radius: 6px;
 }
 
 .back-link:hover {
   color: #0056b3;
-  text-decoration: underline;
+  background-color: rgba(0, 123, 255, 0.05);
 }
 
-.blog-title {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 1rem;
-  line-height: 1.2;
+.blog-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+  min-height: 600px;
+}
+
+/* 左侧图片区域 */
+.blog-image-section {
+  position: relative;
+  background-color: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .blog-cover-image {
   width: 100%;
-  max-height: 450px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: block;
 }
 
+.no-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.no-image-placeholder i {
+  font-size: 4rem;
+  margin-bottom: 16px;
+  color: #ddd;
+}
+
+/* 右侧详情区域 */
+.blog-content-section {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #ffffff;
+}
+
+/* 作者信息 - 最上方 */
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.author-avatar {
+  flex-shrink: 0;
+}
+
+.avatar-image {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #f8f9fa;
+}
+
+.avatar-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #adb5bd;
+  font-size: 1.2rem;
+  border: 2px solid #e9ecef;
+}
+
+.author-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.author-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.author-bio {
+  font-size: 0.9rem;
+  color: #6c757d;
+  line-height: 1.4;
+}
+
+/* 文章标题 */
+.blog-title {
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: #212529;
+  line-height: 1.3;
+  margin: 0;
+}
+
+/* 文章内容 */
+.blog-content {
+  flex: 1;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #495057;
+}
+
+/* 话题标签 */
+.topics-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.topic-tag {
+  color: #495057;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 6px 12px;
+  background-color: #f8f9fa;
+  border-radius: 16px;
+  border: 1px solid #e9ecef;
+}
+
+.topic-tag:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* 发布时间 */
 .blog-meta {
   display: flex;
-  gap: 1.5rem; /* Spacing between meta items */
+  align-items: center;
+  gap: 8px;
   font-size: 0.9rem;
-  color: #555;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #eee;
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  color: #6c757d;
+  padding: 12px 0;
 }
 
-.blog-meta span {
-  padding-right: 1.5rem;
-  border-right: 1px solid #ddd;
-}
-.blog-meta span:last-child {
-  border-right: none;
-  padding-right: 0;
+.blog-meta i {
+  color: #adb5bd;
 }
 
-.blog-content {
+/* 点赞区域 - 最下方 */
+.like-section {
+  padding: 20px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+.like-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.like-button {
+  width: 56px;
+  height: 56px;
+  border: none;
+  background: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.like-button:hover {
+  background: transparent;
+  transform: scale(1.1);
+}
+
+.like-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.like-button:disabled:hover {
+  background: transparent;
+  transform: none;
+}
+
+.loading-text {
+  font-size: 1.4rem;
+  color: #ff6b9d;
+  font-weight: 600;
+}
+
+.like-icon {
+  font-style: normal;
+  font-size: 2.2rem;
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  color: #adb5bd;
+  filter: drop-shadow(0 2px 4px rgba(173, 181, 189, 0.2));
+}
+
+.like-icon.liked-icon {
+  color: #ff1744;
+  transform: scale(1.3);
+  filter: drop-shadow(0 4px 12px rgba(255, 23, 68, 0.4));
+  animation: loveExplosion 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes loveExplosion {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.5) rotate(-5deg);
+  }
+  50% {
+    transform: scale(1.8) rotate(5deg);
+  }
+  75% {
+    transform: scale(1.4) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1.3) rotate(0deg);
+  }
+}
+
+/* 添加点击时的粒子效果 */
+.like-button:active .like-icon.liked-icon {
+  animation: loveExplosion 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55), sparkle 1s ease-out;
+}
+
+@keyframes sparkle {
+  0% {
+    filter: drop-shadow(0 4px 12px rgba(255, 23, 68, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 4px 12px rgba(255, 23, 68, 0.8)) drop-shadow(0 0 20px rgba(255, 107, 157, 0.6));
+  }
+  100% {
+    filter: drop-shadow(0 4px 12px rgba(255, 23, 68, 0.4));
+  }
+}
+
+.like-count {
   font-size: 1.1rem;
-  line-height: 1.8;
-  color: #333;
-  margin-bottom: 2rem;
+  font-weight: 600;
+  color: #495057;
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+/* 加载和错误状态 */
+.loading-message, .error-message {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.1rem;
+  color: #6c757d;
+}
+
+.error-message {
+  color: #dc3545;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .blog-detail-container {
+    padding: 16px;
+  }
+  
+  .blog-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: none;
+    border-radius: 0;
+  }
+  
+  .blog-image-section {
+    min-height: 300px;
+    order: 2;
+    border-top: 1px solid #e9ecef;
+  }
+  
+  .blog-content-section {
+    padding: 24px;
+    gap: 20px;
+    order: 1;
+  }
+  
+  .blog-title {
+    font-size: 1.8rem;
+  }
+  
+  .author-info {
+    gap: 12px;
+  }
+  
+  .avatar-image, .avatar-placeholder {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .author-name {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .blog-content-section {
+    padding: 20px;
+  }
+  
+  .blog-title {
+    font-size: 1.6rem;
+  }
+  
+  .author-info {
+    gap: 10px;
+  }
+  
+  .avatar-image, .avatar-placeholder {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .author-name {
+    font-size: 0.95rem;
+  }
 }
 
 /* 内容样式 */
@@ -271,7 +593,7 @@ onMounted(() => {
 .blog-content ::v-deep(h3) {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
-  color: #2c3e50;
+  color: #212529;
 }
 
 .blog-content ::v-deep(p) {
@@ -285,14 +607,15 @@ onMounted(() => {
 }
 
 .blog-content ::v-deep(a) {
-  color: #3498db;
+  color: #007bff;
   text-decoration: underline;
 }
 
 .blog-content ::v-deep(img) {
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: 8px;
   margin: 1em 0;
+  border: 1px solid #e9ecef;
 }
 </style> 

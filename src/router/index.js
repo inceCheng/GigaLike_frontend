@@ -89,7 +89,7 @@ router.beforeEach(async (to, from, next) => {
     const isSessionValid = await userStore.validateSession()
     if (!isSessionValid) {
       // Session无效，跳转到登录页
-      next({ name: 'Login' })
+    next({ name: 'Login' })
       return
     }
   }
