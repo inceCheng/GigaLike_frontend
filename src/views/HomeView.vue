@@ -3,17 +3,22 @@
     <!-- 顶部标签导航栏 -->
     <div class="categories-container">
       <div class="categories-wrapper">
-        <div class="category-item active">推荐</div>
-        <div class="category-item">穿搭</div>
-        <div class="category-item">美食</div>
-        <div class="category-item">彩妆</div>
-        <div class="category-item">影视</div>
-        <div class="category-item">职场</div>
-        <div class="category-item">情感</div>
-        <div class="category-item">家居</div>
-        <div class="category-item">游戏</div>
-        <div class="category-item">旅行</div>
-        <div class="category-item">健身</div>
+        <div 
+          class="category-item" 
+          :class="{ active: selectedTopicId === null }"
+          @click="selectTopic(null)"
+        >
+          推荐
+        </div>
+        <div 
+          v-for="topic in hotTopics" 
+          :key="topic.id"
+          class="category-item"
+          :class="{ active: selectedTopicId === topic.id }"
+          @click="selectTopic(topic.id)"
+        >
+          {{ topic.name }}
+        </div>
       </div>
     </div>
 
@@ -26,7 +31,7 @@
         </div>
         
         <div v-else-if="blogs.length === 0" class="empty-container">
-          <p>暂无博客内容</p>
+          <p>{{ selectedTopicId ? '该话题下暂无博客内容' : '暂无博客内容' }}</p>
           <button @click="fetchBlogs" class="refresh-btn">刷新</button>
         </div>
         
@@ -48,7 +53,9 @@ import BlogCard from '../components/BlogCard.vue'
 
 const router = useRouter()
 const blogs = ref([])
+const hotTopics = ref([])
 const loading = ref(true)
+const selectedTopicId = ref(null)
 
 // 模拟数据，当后端API没有实现时使用
 const mockBlogs = [
@@ -108,29 +115,68 @@ const mockBlogs = [
   }
 ]
 
+// 加载热门话题
+const loadHotTopics = async () => {
+  try {
+    const response = await api.getHotTopics(10)
+    if (response.data && response.data.code === 0 && response.data.data) {
+      hotTopics.value = response.data.data
+      console.log('热门话题加载成功:', hotTopics.value)
+    }
+  } catch (error) {
+    console.error('获取热门话题失败:', error)
+    // 如果获取热门话题失败，可以设置一些默认话题
+    hotTopics.value = []
+  }
+}
+
 const fetchBlogs = async () => {
   loading.value = true
   try {
-    // 尝试从API获取博客数据
-    const response = await api.getBlogs()
-    if (response.data && response.data.data) {
+    // 根据选中的话题ID获取博客列表
+    const response = await api.getBlogs(selectedTopicId.value)
+    if (response.data && response.data.code === 0 && response.data.data) {
       blogs.value = response.data.data
+      console.log('博客列表加载成功:', blogs.value.length, '篇博客')
+    } else {
+      console.warn('博客列表响应异常:', response.data)
+      blogs.value = []
     }
   } catch (error) {
     console.error('获取博客列表失败:', error)
-    // API 请求失败时，依旧使用模拟数据（或者可以根据产品需求改成显示错误信息）
-    blogs.value = mockBlogs
+    // API 请求失败时，使用模拟数据（仅在推荐页面）
+    if (selectedTopicId.value === null) {
+      blogs.value = mockBlogs
+    } else {
+      blogs.value = []
+    }
   } finally {
     loading.value = false
   }
+}
+
+const selectTopic = async (topicId) => {
+  if (selectedTopicId.value === topicId) {
+    return // 如果点击的是当前已选中的话题，不做任何操作
+  }
+  
+  selectedTopicId.value = topicId
+  console.log('选择话题:', topicId === null ? '推荐' : `话题ID: ${topicId}`)
+  
+  // 重新获取博客列表
+  await fetchBlogs()
 }
 
 const viewBlogDetail = (blogId) => {
   router.push({ name: 'BlogDetail', params: { id: blogId } })
 }
 
-onMounted(() => {
-  fetchBlogs()
+onMounted(async () => {
+  // 并行加载热门话题和博客列表
+  await Promise.all([
+    loadHotTopics(),
+    fetchBlogs()
+  ])
 })
 </script>
 

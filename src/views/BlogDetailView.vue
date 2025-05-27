@@ -5,7 +5,7 @@
     
     <div v-if="blog && !isLoading && !error" class="blog-detail-container">
       <!-- 返回按钮 -->
-      <router-link to="/" class="back-link">&larr; Back to Home</router-link>
+      <router-link to="/" class="back-link">&larr; 首页</router-link>
       
       <!-- 左右分栏布局 -->
       <div class="blog-layout">
@@ -64,25 +64,24 @@
           
           <!-- 点赞信息 -->
           <div class="like-section">
-            <button 
-              @click="handleLike" 
-              :class="{ 'liked': blog.hasThumb, 'unliked': !blog.hasThumb }" 
-              :disabled="likeActionLoading"
-              class="like-button"
-            >
-              <span v-if="likeActionLoading">Processing...</span>
-              <span v-else>
-                <i class="like-icon">&#10084;</i> 
-                {{ blog.hasThumb ? 'Unlike' : 'Like' }}
-              </span>
-            </button>
-            <span class="like-count">{{ blog.thumbCount }} Likes</span>
+            <div class="like-container">
+              <button 
+                @click="handleLike" 
+                :disabled="likeActionLoading"
+                class="like-button"
+                :title="blog.hasThumb ? '取消点赞' : '点赞'"
+              >
+                <span v-if="likeActionLoading" class="loading-text">...</span>
+                <i v-else class="like-icon" :class="{ 'liked-icon': blog.hasThumb }">♥</i>
+              </button>
+              <span class="like-count">{{ blog.thumbCount }}</span>
+            </div>
             <p v-if="likeError" class="error-message">{{ likeError }}</p>
           </div>
           
           <!-- 创建时间 -->
           <div class="blog-meta">
-            <span>Created: {{ formatDate(blog.createTime) }}</span>
+            <span> {{ formatDate(blog.createTime) }}</span>
           </div>
         </div>
       </div>
@@ -91,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../services/api'
 import BlogContent from '../components/BlogContent.vue'
@@ -136,23 +135,39 @@ const fetchBlogDetails = async () => {
 
 const handleLike = async () => {
   if (!userStore.isLoggedIn) {
-    likeError.value = 'You must be logged in to like a post.';
+    likeError.value = '请先登录后再点赞';
     return;
   }
   likeError.value = '';
   likeActionLoading.value = true;
+  
+  // 保存当前状态，用于失败时回滚
+  const originalHasThumb = blog.value.hasThumb;
+  const originalThumbCount = blog.value.thumbCount;
+  
   try {
-    // Use the hasThumb property from backend to determine if we should like or unlike
-    const response = await api.toggleThumb(props.id, blog.value.hasThumb);
+    // 乐观更新：先更新UI状态
+    blog.value.hasThumb = !originalHasThumb;
+    blog.value.thumbCount = originalHasThumb ? originalThumbCount - 1 : originalThumbCount + 1;
+    
+    // 发送请求到后端
+    const response = await api.toggleThumb(props.id, originalHasThumb);
+    
     if (response.data && response.data.code === 0) {
-      // Update the blog data - refetch to get accurate data
-      await fetchBlogDetails();
+      // 请求成功，UI已经更新，无需额外操作
+      console.log('点赞操作成功');
     } else {
-      likeError.value = response.data.message || 'Failed to update like status.';
+      // 请求失败，回滚UI状态
+      blog.value.hasThumb = originalHasThumb;
+      blog.value.thumbCount = originalThumbCount;
+      likeError.value = response.data.message || '点赞操作失败';
     }
   } catch (err) {
+    // 请求出错，回滚UI状态
+    blog.value.hasThumb = originalHasThumb;
+    blog.value.thumbCount = originalThumbCount;
     console.error('Failed to toggle like:', err);
-    likeError.value = 'An error occurred while liking the post.';
+    likeError.value = '点赞操作出错，请稍后重试';
     if (err.response && err.response.data && err.response.data.message) {
       likeError.value = err.response.data.message;
     }
@@ -166,6 +181,13 @@ const formatDate = (dateString) => {
   const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
   return new Date(dateString).toLocaleDateString(undefined, options);
 }
+
+// 监听用户登录状态变化，重新获取博客详情以更新点赞状态
+watch(() => userStore.isLoggedIn, (newValue, oldValue) => {
+  if (newValue !== oldValue) {
+    fetchBlogDetails()
+  }
+})
 
 onMounted(() => {
   fetchBlogDetails()
@@ -333,54 +355,80 @@ onMounted(() => {
 
 /* 点赞区域 */
 .like-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   padding: 16px 0;
 }
 
+.like-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .like-button {
-  padding: 10px 20px;
-  font-size: 0.9rem;
-  border-radius: 25px;
-  border: 2px solid transparent;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
   transition: all 0.3s ease;
-  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  position: relative;
 }
 
-.like-button.liked {
-  background-color: #e91e63;
-  color: white;
-  border-color: #e91e63;
+.like-button:hover {
+  background-color: rgba(255, 71, 87, 0.1);
+  transform: scale(1.05);
 }
 
-.like-button.liked:hover {
-  background-color: #c2185b;
+.like-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
 }
 
-.like-button.unliked {
-  background-color: #f0f2f5;
-  color: #333;
-  border-color: #ddd;
+.like-button:disabled:hover {
+  background-color: transparent;
 }
 
-.like-button.unliked:hover {
-  background-color: #e0e0e0;
-  border-color: #ccc;
+.loading-text {
+  font-size: 1.2rem;
+  color: #999;
 }
 
 .like-icon {
   font-style: normal;
+  font-size: 1.6rem;
+  transition: all 0.3s ease;
+  color: #ccc;
+}
+
+.like-icon.liked-icon {
+  color: #ff4757;
+  transform: scale(1.2);
+  text-shadow: 0 0 10px rgba(255, 71, 87, 0.4);
+  animation: heartBeat 0.6s ease-in-out;
+}
+
+@keyframes heartBeat {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1.2);
+  }
 }
 
 .like-count {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  color: #555;
+  color: #333;
+  user-select: none;
 }
 
 /* 创建时间 */

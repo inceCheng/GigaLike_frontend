@@ -20,7 +20,13 @@
 
       <div class="form-section">
         <label class="form-label">封面图片</label>
-        <div class="cover-upload-area">
+        <div 
+          class="cover-upload-area"
+          @drop.prevent="handleDrop"
+          @dragover.prevent="handleDragOver"
+          @dragleave.prevent="handleDragLeave"
+          :class="{ 'drag-over': isDragOver }"
+        >
           <div v-if="postForm.coverImg" class="cover-preview">
             <img :src="postForm.coverImg" alt="封面预览" />
             <button type="button" @click="removeCoverImage" class="remove-cover-btn">
@@ -34,8 +40,8 @@
             </div>
             <div v-else>
               <i class="fa-solid fa-image"></i>
-              <p>点击上传封面图片</p>
-              <span>支持 JPG、PNG 格式，最大5MB</span>
+              <p>点击或拖拽上传封面图片</p>
+              <span>支持 JPG、PNG 格式，最大10MB</span>
             </div>
           </div>
           <input 
@@ -44,16 +50,6 @@
             accept="image/*" 
             @change="handleFileUpload"
             style="display: none"
-          />
-        </div>
-        <div class="form-help">
-          或者输入图片链接：
-          <input 
-            type="url" 
-            v-model="imageUrl" 
-            @input="handleImageUrlChange"
-            placeholder="https://example.com/image.jpg"
-            class="form-input url-input"
           />
         </div>
       </div>
@@ -204,10 +200,10 @@ const postForm = ref({
   topics: []
 })
 
-const imageUrl = ref('')
 const topicInput = ref('')
 const isSubmitting = ref(false)
 const isUploading = ref(false)
+const isDragOver = ref(false)
 const showPreview = ref(false)
 const showTopicSuggestions = ref(false)
 const hotTopics = ref([])
@@ -225,9 +221,6 @@ onMounted(async () => {
     try {
       const draftData = JSON.parse(draft)
       postForm.value = { ...postForm.value, ...draftData }
-      if (postForm.value.coverImg) {
-        imageUrl.value = postForm.value.coverImg
-      }
     } catch (error) {
       console.error('Failed to load draft:', error)
     }
@@ -277,12 +270,17 @@ const triggerFileInput = () => {
   }
 }
 
-const handleFileUpload = async (event) => {
-  const file = event.target.files[0]
+const uploadFile = async (file) => {
   if (!file) return
 
-  if (file.size > 5 * 1024 * 1024) { // 5MB limit
-    message.error('图片大小不能超过5MB')
+  if (file.size > 10 * 1024 * 1024) { // 10MB limit
+    message.error('图片大小不能超过10MB')
+    return
+  }
+
+  // 检查文件类型
+  if (!file.type.startsWith('image/')) {
+    message.error('请选择图片文件')
     return
   }
 
@@ -301,7 +299,6 @@ const handleFileUpload = async (event) => {
 
     if (response.data.code === 0) {
       postForm.value.coverImg = response.data.data
-      imageUrl.value = response.data.data
       message.success('图片上传成功')
     } else {
       throw new Error(response.data.message || '上传失败')
@@ -318,13 +315,34 @@ const handleFileUpload = async (event) => {
   }
 }
 
-const handleImageUrlChange = () => {
-  postForm.value.coverImg = imageUrl.value
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0]
+  await uploadFile(file)
+}
+
+// 拖拽上传功能
+const handleDragOver = (event) => {
+  event.preventDefault()
+  isDragOver.value = true
+}
+
+const handleDragLeave = (event) => {
+  event.preventDefault()
+  isDragOver.value = false
+}
+
+const handleDrop = async (event) => {
+  event.preventDefault()
+  isDragOver.value = false
+  
+  const files = event.dataTransfer.files
+  if (files.length > 0) {
+    await uploadFile(files[0])
+  }
 }
 
 const removeCoverImage = () => {
   postForm.value.coverImg = ''
-  imageUrl.value = ''
   if (fileInput.value) {
     fileInput.value.value = ''
   }
@@ -517,10 +535,6 @@ const closePreview = () => {
   box-shadow: 0 0 0 3px rgba(255, 36, 66, 0.1);
 }
 
-.url-input {
-  margin-top: 8px;
-}
-
 .form-textarea {
   width: 100%;
   padding: 12px 16px;
@@ -552,6 +566,12 @@ const closePreview = () => {
   border-radius: 8px;
   position: relative;
   overflow: hidden;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.cover-upload-area.drag-over {
+  border-color: #ff2442;
+  background-color: rgba(255, 36, 66, 0.05);
 }
 
 .cover-preview {
