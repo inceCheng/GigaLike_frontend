@@ -20,7 +20,7 @@
 
       <div class="form-section">
         <label class="form-label">封面图片</label>
-        <div 
+        <div
           class="cover-upload-area"
           @drop.prevent="handleDrop"
           @dragover.prevent="handleDragOver"
@@ -334,7 +334,7 @@ const handleDragLeave = (event) => {
 const handleDrop = async (event) => {
   event.preventDefault()
   isDragOver.value = false
-  
+
   const files = event.dataTransfer.files
   if (files.length > 0) {
     await uploadFile(files[0])

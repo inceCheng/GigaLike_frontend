@@ -16,6 +16,9 @@ export default {
   createBlog(blogData) {
     return apiClient.post('/blog/create', blogData);
   },
+  createBlog(blogData) {
+    return apiClient.post('/blog/create', blogData);
+  },
   doThumb(blogId) {
     // 使用字符串形式传递大整数，避免精度丢失
     return apiClient.post('/thumb/do', { blogId: String(blogId) });
