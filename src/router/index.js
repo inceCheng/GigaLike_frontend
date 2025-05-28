@@ -6,6 +6,7 @@ import ProfilePage from '../views/ProfilePage.vue'
 import BlogDetailView from '../views/BlogDetailView.vue'
 import CreatePostPage from '../views/CreatePostPage.vue'
 import Messages from '../views/Messages.vue'
+import NotificationTest from '../views/NotificationTest.vue'
 import { useUserStore } from '@/stores/user'
 
 const routes = [
@@ -72,6 +73,12 @@ const routes = [
     path: '/messages',
     name: 'Messages',
     component: Messages,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/notification-test',
+    name: 'NotificationTest',
+    component: NotificationTest,
     meta: { requiresAuth: true }
   }
 ]

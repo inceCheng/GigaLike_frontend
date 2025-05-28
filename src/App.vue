@@ -58,7 +58,17 @@
             :class="{ active: route.path === '/messages' }"
             @click="router.push('/messages')"
           >
-            <i class="nav-icon fa-solid fa-bell"></i>
+            <div class="nav-icon-container">
+              <i class="nav-icon fa-solid fa-bell"></i>
+              <!-- 未读通知徽章 -->
+              <div 
+                v-if="notificationStore.hasUnread" 
+                class="notification-badge"
+                :class="{ 'large-count': notificationStore.unreadCount > 99 }"
+              >
+                {{ notificationStore.unreadCount > 99 ? '99+' : notificationStore.unreadCount }}
+              </div>
+            </div>
             <span>消息</span>
           </div>
           <div 
@@ -106,22 +116,39 @@
         <a href="#">用户协议</a>
       </div>
     </footer>
+
+    <!-- 实时通知弹窗 -->
+    <NotificationToast
+      v-for="toast in notificationToasts"
+      :key="toast.id"
+      :notification="toast"
+      @close="removeNotificationToast(toast.id)"
+      @click="handleNotificationToastClick"
+    />
   </div>
 </template>
 
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue'
 import { Modal, message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
+import { notificationWS, requestNotificationPermission } from '@/services/notificationWebSocket'
+import NotificationToast from '@/components/NotificationToast.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const showUserMenu = ref(false)
 const showLoginHover = ref(false)
 const searchKeyword = ref('')
+const notificationToasts = ref([])
+
+let unsubscribeWS = null
+let toastIdCounter = 0
 
 const handleUserClick = (event) => {
   if (!userStore.isLoggedIn) {
@@ -145,6 +172,18 @@ const handleLogout = async () => {
     async onOk() {
       try {
         await userStore.logout()
+        
+        // 断开WebSocket连接
+        if (unsubscribeWS) {
+          unsubscribeWS()
+          unsubscribeWS = null
+        }
+        notificationWS.disconnect()
+        
+        // 重置通知状态
+        notificationStore.reset()
+        notificationToasts.value = []
+        
         router.push('/')
         message.success('已成功退出登录')
       } catch (error) {
@@ -192,6 +231,114 @@ const handleSearch = () => {
   searchKeyword.value = ''
 }
 
+// 初始化通知系统
+const initNotificationSystem = async () => {
+  if (!userStore.isLoggedIn || !userStore.user?.id) return
+
+  try {
+    // 请求浏览器通知权限
+    await requestNotificationPermission()
+    
+    // 加载未读通知数量
+    await notificationStore.loadUnreadCount()
+    
+    // 连接WebSocket
+    connectWebSocket()
+  } catch (error) {
+    console.error('初始化通知系统失败:', error)
+  }
+}
+
+// 连接WebSocket
+const connectWebSocket = () => {
+  if (!userStore.user?.id || unsubscribeWS) return
+  
+  // 订阅WebSocket消息
+  unsubscribeWS = notificationWS.subscribe((message) => {
+    switch (message.type) {
+      case 'NOTIFICATION':
+        handleNewNotification(message.data)
+        break
+      case 'CONNECTION_STATUS':
+        notificationStore.updateConnectionStatus(message.data.connected)
+        break
+      case 'BROADCAST':
+        handleBroadcast(message.data)
+        break
+    }
+  })
+  
+  // 连接WebSocket
+  notificationWS.connect(userStore.user.id)
+}
+
+// 处理新通知
+const handleNewNotification = (notification) => {
+  // 更新未读数量
+  notificationStore.unreadCount++
+  
+  // 显示实时通知弹窗（只在非消息页面显示）
+  if (route.path !== '/messages') {
+    showNotificationToast(notification)
+  }
+}
+
+// 显示通知弹窗
+const showNotificationToast = (notification) => {
+  const toast = {
+    ...notification,
+    id: `toast-${++toastIdCounter}-${notification.id}`
+  }
+  
+  notificationToasts.value.push(toast)
+  
+  // 最多同时显示3个通知
+  if (notificationToasts.value.length > 3) {
+    notificationToasts.value.shift()
+  }
+}
+
+// 移除通知弹窗
+const removeNotificationToast = (toastId) => {
+  const index = notificationToasts.value.findIndex(toast => toast.id === toastId)
+  if (index > -1) {
+    notificationToasts.value.splice(index, 1)
+  }
+}
+
+// 处理通知弹窗点击
+const handleNotificationToastClick = (notification) => {
+  // 移除所有相关的弹窗
+  notificationToasts.value = notificationToasts.value.filter(
+    toast => toast.id !== notification.id
+  )
+}
+
+// 处理系统广播
+const handleBroadcast = (broadcast) => {
+  // 显示系统广播消息
+  message.info(broadcast.message, 5)
+}
+
+// 监听用户登录状态变化
+watch(() => userStore.isLoggedIn, (isLoggedIn) => {
+  if (isLoggedIn) {
+    // 用户登录后初始化通知系统
+    nextTick(() => {
+      initNotificationSystem()
+    })
+  } else {
+    // 用户登出后清理
+    if (unsubscribeWS) {
+      unsubscribeWS()
+      unsubscribeWS = null
+    }
+    notificationWS.disconnect()
+    notificationStore.reset()
+    notificationToasts.value = []
+  }
+})
+
 // 监听头像版本号变化，强制更新头像
 watch(() => userStore.avatarVersion, async (newVersion) => {
   if (userStore.user?.avatarUrl) {
@@ -209,7 +356,20 @@ onMounted(() => {
   document.addEventListener('click', () => {
     showUserMenu.value = false
   })
-});
+
+  // 如果用户已登录，初始化通知系统
+  if (userStore.isLoggedIn) {
+    initNotificationSystem()
+  }
+})
+
+onUnmounted(() => {
+  // 清理WebSocket连接
+  if (unsubscribeWS) {
+    unsubscribeWS()
+  }
+  notificationWS.disconnect()
+})
 
 </script>
 
@@ -437,12 +597,55 @@ body {
   transform: scale(1.1); /* 激活时图标稍微放大 */
 }
 
+.nav-icon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
 .nav-icon {
   font-size: 1.8rem; /* 调大图标尺寸 */
   margin-bottom: 8px;
   position: relative;
   z-index: 1;
   transition: all 0.2s ease;
+}
+
+/* 通知徽章样式 */
+.notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff2e51;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  animation: notification-pulse 2s infinite;
+}
+
+.notification-badge.large-count {
+  padding: 2px 4px;
+  font-size: 9px;
+}
+
+@keyframes notification-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 /* 导航栏头像样式 */

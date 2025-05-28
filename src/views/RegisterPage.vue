@@ -3,13 +3,37 @@
     <div class="register-box">
       <h1>创建账号</h1>
       <div class="form-group">
-        <input type="text" v-model="username" placeholder="用户名" />
+        <input 
+          type="text" 
+          v-model="username" 
+          placeholder="用户名"
+          :class="{ 'error': usernameError }"
+          @blur="validateUsername"
+          @input="clearUsernameError"
+        />
+        <div v-if="usernameError" class="field-error">{{ usernameError }}</div>
       </div>
       <div class="form-group">
-        <input type="password" v-model="password" placeholder="密码" />
+        <input 
+          type="password" 
+          v-model="password" 
+          placeholder="密码"
+          :class="{ 'error': passwordError }"
+          @blur="validatePassword"
+          @input="clearPasswordError"
+        />
+        <div v-if="passwordError" class="field-error">{{ passwordError }}</div>
       </div>
       <div class="form-group">
-        <input type="password" v-model="confirmPassword" placeholder="确认密码" />
+        <input 
+          type="password" 
+          v-model="confirmPassword" 
+          placeholder="确认密码"
+          :class="{ 'error': confirmPasswordError }"
+          @blur="validateConfirmPassword"
+          @input="clearConfirmPasswordError"
+        />
+        <div v-if="confirmPasswordError" class="field-error">{{ confirmPasswordError }}</div>
       </div>
       
       <!-- 邮箱输入 -->
@@ -106,6 +130,9 @@ const isLoading = ref(false)
 const isEmailSending = ref(false)
 const emailCountdown = ref(0)
 const errorMessage = ref('')
+const usernameError = ref('')
+const passwordError = ref('')
+const confirmPasswordError = ref('')
 
 // 表单验证
 const isFormValid = computed(() => {
@@ -116,13 +143,86 @@ const isFormValid = computed(() => {
          emailCode.value && 
          captchaCode.value &&
          password.value === confirmPassword.value &&
-         isValidEmail(email.value)
+         isValidEmail(email.value) &&
+         !usernameError.value &&
+         !passwordError.value &&
+         !confirmPasswordError.value
 })
 
 // 邮箱格式验证
 const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
+}
+
+// 用户名校验
+const validateUsername = () => {
+  const value = username.value.trim()
+  if (!value) {
+    usernameError.value = '请输入用户名'
+    return false
+  }
+  if (value.length < 4 || value.length > 20) {
+    usernameError.value = '用户名长度必须在4-20个字符之间'
+    return false
+  }
+  usernameError.value = ''
+  return true
+}
+
+// 密码校验
+const validatePassword = () => {
+  const value = password.value
+  if (!value) {
+    passwordError.value = '请输入密码'
+    return false
+  }
+  if (value.length < 5 || value.length > 20) {
+    passwordError.value = '密码长度必须在5-20个字符之间'
+    return false
+  }
+  passwordError.value = ''
+  return true
+}
+
+// 确认密码校验
+const validateConfirmPassword = () => {
+  const value = confirmPassword.value
+  if (!value) {
+    confirmPasswordError.value = '请确认密码'
+    return false
+  }
+  if (value !== password.value) {
+    confirmPasswordError.value = '两次输入的密码不一致'
+    return false
+  }
+  confirmPasswordError.value = ''
+  return true
+}
+
+// 清除用户名错误
+const clearUsernameError = () => {
+  if (usernameError.value) {
+    usernameError.value = ''
+  }
+}
+
+// 清除密码错误
+const clearPasswordError = () => {
+  if (passwordError.value) {
+    passwordError.value = ''
+  }
+  // 如果密码改变了，也需要重新验证确认密码
+  if (confirmPassword.value && confirmPasswordError.value) {
+    validateConfirmPassword()
+  }
+}
+
+// 清除确认密码错误
+const clearConfirmPasswordError = () => {
+  if (confirmPasswordError.value) {
+    confirmPasswordError.value = ''
+  }
 }
 
 // 获取图形验证码
@@ -203,19 +303,22 @@ const startEmailCountdown = () => {
 
 // 注册处理
 const handleRegister = async () => {
-  // 表单验证
-  if (!username.value || !password.value || !confirmPassword.value || !email.value) {
-    errorMessage.value = '请填写完整信息'
+  // 执行表单校验
+  const isUsernameValid = validateUsername()
+  const isPasswordValid = validatePassword()
+  const isConfirmPasswordValid = validateConfirmPassword()
+  
+  if (!isUsernameValid || !isPasswordValid || !isConfirmPasswordValid) {
+    return
+  }
+
+  if (!email.value) {
+    errorMessage.value = '请输入邮箱地址'
     return
   }
 
   if (!isValidEmail(email.value)) {
     errorMessage.value = '请输入正确的邮箱格式'
-    return
-  }
-
-  if (password.value !== confirmPassword.value) {
-    errorMessage.value = '两次输入的密码不一致'
     return
   }
 
@@ -482,6 +585,19 @@ input::placeholder {
   background: rgba(82, 196, 26, 0.05);
   border-radius: 6px;
   border: 1px solid rgba(82, 196, 26, 0.1);
+}
+
+/* 字段错误样式 */
+.field-error {
+  color: #ff2e51;
+  font-size: 12px;
+  margin-top: 4px;
+  margin-left: 4px;
+}
+
+input.error {
+  border-color: #ff2e51;
+  box-shadow: 0 0 0 3px rgba(255, 46, 81, 0.1);
 }
 
 .login-link {

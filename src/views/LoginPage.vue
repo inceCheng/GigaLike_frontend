@@ -3,10 +3,26 @@
     <div class="login-box">
       <h1>欢迎回来</h1>
       <div class="form-group">
-        <input type="text" v-model="username" placeholder="用户名" />
+        <input 
+          type="text" 
+          v-model="username" 
+          placeholder="用户名"
+          :class="{ 'error': usernameError }"
+          @blur="validateUsername"
+          @input="clearUsernameError"
+        />
+        <div v-if="usernameError" class="field-error">{{ usernameError }}</div>
       </div>
       <div class="form-group">
-        <input type="password" v-model="password" placeholder="密码" />
+        <input 
+          type="password" 
+          v-model="password" 
+          placeholder="密码"
+          :class="{ 'error': passwordError }"
+          @blur="validatePassword"
+          @input="clearPasswordError"
+        />
+        <div v-if="passwordError" class="field-error">{{ passwordError }}</div>
       </div>
       
       <!-- 图形验证码 -->
@@ -69,6 +85,8 @@ const captchaImage = ref('')
 const captchaId = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
+const usernameError = ref('')
+const passwordError = ref('')
 
 // 获取验证码
 const getCaptcha = async () => {
@@ -94,9 +112,56 @@ const refreshCaptcha = () => {
   getCaptcha()
 }
 
+// 用户名校验
+const validateUsername = () => {
+  const value = username.value.trim()
+  if (!value) {
+    usernameError.value = '请输入用户名'
+    return false
+  }
+  if (value.length < 4 || value.length > 20) {
+    usernameError.value = '用户名长度必须在4-20个字符之间'
+    return false
+  }
+  usernameError.value = ''
+  return true
+}
+
+// 密码校验
+const validatePassword = () => {
+  const value = password.value
+  if (!value) {
+    passwordError.value = '请输入密码'
+    return false
+  }
+  if (value.length < 5 || value.length > 20) {
+    passwordError.value = '密码长度必须在5-20个字符之间'
+    return false
+  }
+  passwordError.value = ''
+  return true
+}
+
+// 清除用户名错误
+const clearUsernameError = () => {
+  if (usernameError.value) {
+    usernameError.value = ''
+  }
+}
+
+// 清除密码错误
+const clearPasswordError = () => {
+  if (passwordError.value) {
+    passwordError.value = ''
+  }
+}
+
 const handleLogin = async () => {
-  if (!username.value || !password.value) {
-    errorMessage.value = '请输入用户名和密码'
+  // 执行表单校验
+  const isUsernameValid = validateUsername()
+  const isPasswordValid = validatePassword()
+  
+  if (!isUsernameValid || !isPasswordValid) {
     return
   }
 
@@ -294,6 +359,19 @@ input::placeholder {
   background: rgba(255, 46, 81, 0.05);
   border-radius: 6px;
   border: 1px solid rgba(255, 46, 81, 0.1);
+}
+
+/* 字段错误样式 */
+.field-error {
+  color: #ff2e51;
+  font-size: 12px;
+  margin-top: 4px;
+  margin-left: 4px;
+}
+
+input.error {
+  border-color: #ff2e51;
+  box-shadow: 0 0 0 3px rgba(255, 46, 81, 0.1);
 }
 
 .register-link {
