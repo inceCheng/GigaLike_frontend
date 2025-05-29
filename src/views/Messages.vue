@@ -4,18 +4,6 @@
     <div class="messages-header">
       <div class="header-left">
         <h1>消息通知</h1>
-        <div class="connection-status" :class="{ connected: notificationStore.isConnected }">
-          <i class="fa-solid fa-circle"></i>
-          {{ notificationStore.isConnected ? '实时连接' : '连接断开' }}
-          <button 
-            v-if="!notificationStore.isConnected && userStore.isLoggedIn"
-            class="reconnect-btn"
-            @click="handleReconnect"
-            title="重新连接"
-          >
-            <i class="fa-solid fa-refresh"></i>
-          </button>
-        </div>
       </div>
       
       <div class="header-actions">
@@ -226,13 +214,13 @@ const init = async () => {
 // 确保WebSocket连接
 const ensureWebSocketConnection = async () => {
   if (!userStore.user?.id) {
-    console.warn('用户未登录，无法建立WebSocket连接')
+    console.warn('用户未登录，无法建立SockJS连接')
     return
   }
   
   // 检查连接状态
   if (!notificationWS.isConnected()) {
-    console.log('WebSocket未连接，正在建立连接...')
+    console.log('SockJS未连接，正在建立连接...')
     
     // 如果还没有订阅，先订阅
     if (!unsubscribeWS) {
@@ -242,7 +230,7 @@ const ensureWebSocketConnection = async () => {
       notificationWS.connect(userStore.user.id)
     }
   } else {
-    console.log('WebSocket连接正常')
+    console.log('SockJS连接正常')
   }
 }
 
@@ -533,39 +521,6 @@ onUnmounted(() => {
   font-weight: 600;
   color: #333;
   margin: 0 0 8px 0;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #999;
-}
-
-.connection-status.connected {
-  color: #52c41a;
-}
-
-.connection-status i {
-  font-size: 8px;
-}
-
-.reconnect-btn {
-  margin-left: 8px;
-  background: none;
-  border: 1px solid #ff4d4f;
-  color: #ff4d4f;
-  border-radius: 4px;
-  padding: 2px 6px;
-  cursor: pointer;
-  font-size: 10px;
-  transition: all 0.2s ease;
-}
-
-.reconnect-btn:hover {
-  background: #ff4d4f;
-  color: white;
 }
 
 .header-actions {

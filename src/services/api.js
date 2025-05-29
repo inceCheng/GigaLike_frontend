@@ -99,5 +99,10 @@ export default {
     return apiClient.post('/api/realtime/test', null, {
       params: { targetUserId: String(targetUserId), message }
     });
+  },
+
+  // 断开WebSocket连接
+  disconnectWebSocket() {
+    return apiClient.post('/api/realtime/disconnect');
   }
 }; 

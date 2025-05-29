@@ -118,12 +118,12 @@
     </footer>
 
     <!-- 实时通知弹窗 -->
-    <NotificationToast
+    <NotificationAlert
       v-for="toast in notificationToasts"
-      :key="toast.id"
+      :key="toast.toastId"
       :notification="toast"
-      @close="removeNotificationToast(toast.id)"
-      @click="handleNotificationToastClick"
+      @click="handleNotificationAlertClick"
+      @ignore="() => removeNotificationToast(toast.originalId)"
     />
   </div>
 </template>
@@ -135,7 +135,7 @@ import { Modal, message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
 import { notificationWS, requestNotificationPermission } from '@/services/notificationWebSocket'
-import NotificationToast from '@/components/NotificationToast.vue'
+import NotificationAlert from '@/components/NotificationAlert.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -178,7 +178,7 @@ const handleLogout = async () => {
           unsubscribeWS()
           unsubscribeWS = null
         }
-        notificationWS.disconnect()
+        await notificationWS.disconnect()
         
         // 重置通知状态
         notificationStore.reset()
@@ -274,12 +274,17 @@ const connectWebSocket = () => {
 
 // 处理新通知
 const handleNewNotification = (notification) => {
-  // 更新未读数量
-  notificationStore.unreadCount++
+  // 检查是否为需要弹出消息框的通知类型
+  const alertTypes = ['LIKE', 'COMMENT', 'FOLLOW', 'SYSTEM']
   
-  // 显示实时通知弹窗（只在非消息页面显示）
-  if (route.path !== '/messages') {
-    showNotificationToast(notification)
+  if (alertTypes.includes(notification.type)) {
+    // 立即更新未读数量
+    notificationStore.unreadCount++
+    
+    // 显示实时通知弹窗（只在非消息页面显示）
+    if (route.path !== '/messages') {
+      showNotificationToast(notification)
+    }
   }
 }
 
@@ -287,7 +292,8 @@ const handleNewNotification = (notification) => {
 const showNotificationToast = (notification) => {
   const toast = {
     ...notification,
-    id: `toast-${++toastIdCounter}-${notification.id}`
+    toastId: `toast-${++toastIdCounter}-${notification.id}`,
+    originalId: notification.id  // 保留原始notification ID
   }
   
   notificationToasts.value.push(toast)
@@ -299,19 +305,31 @@ const showNotificationToast = (notification) => {
 }
 
 // 移除通知弹窗
-const removeNotificationToast = (toastId) => {
-  const index = notificationToasts.value.findIndex(toast => toast.id === toastId)
+const removeNotificationToast = (originalNotificationId) => {
+  const index = notificationToasts.value.findIndex(toast => 
+    toast.originalId === originalNotificationId
+  )
   if (index > -1) {
     notificationToasts.value.splice(index, 1)
   }
 }
 
 // 处理通知弹窗点击
-const handleNotificationToastClick = (notification) => {
-  // 移除所有相关的弹窗
-  notificationToasts.value = notificationToasts.value.filter(
-    toast => toast.id !== notification.id
-  )
+const handleNotificationAlertClick = async (notification) => {
+  // 移除弹窗 - 使用原始的notification ID
+  removeNotificationToast(notification.id)
+  
+  // 标记为已读
+  if (notification.isRead === 0) {
+    try {
+      await notificationStore.markAsRead(notification.id)
+    } catch (error) {
+      console.error('标记已读失败:', error)
+    }
+  }
+  
+  // 跳转到消息页面
+  router.push('/messages')
 }
 
 // 处理系统广播
@@ -321,7 +339,7 @@ const handleBroadcast = (broadcast) => {
 }
 
 // 监听用户登录状态变化
-watch(() => userStore.isLoggedIn, (isLoggedIn) => {
+watch(() => userStore.isLoggedIn, async (isLoggedIn) => {
   if (isLoggedIn) {
     // 用户登录后初始化通知系统
     nextTick(() => {
@@ -333,7 +351,7 @@ watch(() => userStore.isLoggedIn, (isLoggedIn) => {
       unsubscribeWS()
       unsubscribeWS = null
     }
-    notificationWS.disconnect()
+    await notificationWS.disconnect()
     notificationStore.reset()
     notificationToasts.value = []
   }
@@ -363,12 +381,12 @@ onMounted(() => {
   }
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   // 清理WebSocket连接
   if (unsubscribeWS) {
     unsubscribeWS()
   }
-  notificationWS.disconnect()
+  await notificationWS.disconnect()
 })
 
 </script>
@@ -603,6 +621,7 @@ body {
   align-items: center;
   justify-content: center;
   margin-bottom: 8px;
+  z-index: 2; /* 确保图标容器在合适的层级 */
 }
 
 .nav-icon {
@@ -632,6 +651,7 @@ body {
   border: 2px solid white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   animation: notification-pulse 2s infinite;
+  z-index: 10; /* 确保红点在图标上层 */
 }
 
 .notification-badge.large-count {

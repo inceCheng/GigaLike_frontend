@@ -1,3 +1,5 @@
+import SockJS from 'sockjs-client'
+
 class NotificationWebSocket {
   constructor() {
     this.ws = null
@@ -25,7 +27,7 @@ class NotificationWebSocket {
         if (this.isPageVisible) {
           // 页面可见时，如果连接断开则尝试重连
           if (!this.isConnected() && this.userId) {
-            console.log('页面重新可见，检查WebSocket连接状态')
+            console.log('页面重新可见，检查SockJS连接状态')
             this.connect(this.userId)
           }
           // 恢复心跳
@@ -35,7 +37,7 @@ class NotificationWebSocket {
         } else {
           // 页面不可见时，保持连接但可以暂停心跳以节省资源
           // 注意：这里不完全停止心跳，因为服务器可能需要心跳来保持连接
-          console.log('页面不可见，WebSocket连接保持但降低心跳频率')
+          console.log('页面不可见，SockJS连接保持但降低心跳频率')
         }
       })
     }
@@ -45,7 +47,7 @@ class NotificationWebSocket {
   setupNetworkListener() {
     if (typeof window !== 'undefined' && 'navigator' in window && 'onLine' in navigator) {
       window.addEventListener('online', () => {
-        console.log('网络重新连接，尝试恢复WebSocket连接')
+        console.log('网络重新连接，尝试恢复SockJS连接')
         if (!this.isConnected() && this.userId) {
           // 重置重连次数，因为这是网络恢复导致的重连
           this.reconnectAttempts = 0
@@ -55,13 +57,13 @@ class NotificationWebSocket {
       
       window.addEventListener('offline', () => {
         console.log('网络连接断开')
-        // 网络断开时不需要特殊处理，WebSocket会自动触发onclose事件
+        // 网络断开时不需要特殊处理，SockJS会自动触发onclose事件
       })
     }
   }
 
   connect(userId) {
-    if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+    if (this.isConnecting || (this.ws && this.ws.readyState === 1)) { // SockJS uses readyState 1 for OPEN
       return
     }
 
@@ -69,13 +71,15 @@ class NotificationWebSocket {
     this.isConnecting = true
 
     try {
-      // 根据当前协议选择WebSocket协议
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      // 使用 SockJS 连接
+      const protocol = window.location.protocol
       const host = window.location.host
-      const wsUrl = `${protocol}//${host}/api/ws/notification?userId=${userId}`
+      const sockJsUrl = `${protocol}//${host}/api/ws/notification?userId=${userId}`
       
-      console.log('正在连接WebSocket:', wsUrl)
-      this.ws = new WebSocket(wsUrl)
+      console.log('正在连接SockJS:', sockJsUrl)
+      
+      // 使用 SockJS 而不是原生 WebSocket
+      this.ws = new SockJS(sockJsUrl)
       
       this.ws.onopen = this.onOpen.bind(this)
       this.ws.onmessage = this.onMessage.bind(this)
@@ -83,14 +87,14 @@ class NotificationWebSocket {
       this.ws.onerror = this.onError.bind(this)
       
     } catch (error) {
-      console.error('WebSocket连接失败:', error)
+      console.error('SockJS连接失败:', error)
       this.isConnecting = false
       this.reconnect()
     }
   }
 
   onOpen(event) {
-    console.log('WebSocket连接已建立')
+    console.log('SockJS连接已建立')
     this.isConnecting = false
     this.reconnectAttempts = 0
     this.startHeartbeat()
@@ -105,7 +109,7 @@ class NotificationWebSocket {
   onMessage(event) {
     try {
       const message = JSON.parse(event.data)
-      console.log('收到WebSocket消息:', message)
+      console.log('收到SockJS消息:', message)
       
       switch (message.type) {
         case 'CONNECTED':
@@ -124,12 +128,12 @@ class NotificationWebSocket {
           console.log('未知消息类型:', message.type)
       }
     } catch (error) {
-      console.error('解析WebSocket消息失败:', error)
+      console.error('解析SockJS消息失败:', error)
     }
   }
 
   onClose(event) {
-    console.log('WebSocket连接关闭:', event.code, event.reason)
+    console.log('SockJS连接关闭:', event.code, event.reason)
     this.isConnecting = false
     this.stopHeartbeat()
     
@@ -145,7 +149,7 @@ class NotificationWebSocket {
   }
 
   onError(error) {
-    console.error('WebSocket错误:', error)
+    console.error('SockJS错误:', error)
     this.isConnecting = false
   }
 
@@ -197,7 +201,7 @@ class NotificationWebSocket {
 
   startHeartbeat() {
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (this.ws && this.ws.readyState === 1) { // SockJS uses 1 for OPEN
         this.ws.send('PING')
       }
     }, this.heartbeatInterval)
@@ -213,13 +217,13 @@ class NotificationWebSocket {
   reconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.userId) {
       this.reconnectAttempts++
-      console.log(`尝试重连WebSocket (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+      console.log(`尝试重连SockJS (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
       
       setTimeout(() => {
         this.connect(this.userId)
       }, this.reconnectInterval)
     } else {
-      console.error('WebSocket重连失败，已达到最大重试次数')
+      console.error('SockJS重连失败，已达到最大重试次数')
     }
   }
 
@@ -238,8 +242,20 @@ class NotificationWebSocket {
     })
   }
 
-  disconnect() {
+  async disconnect() {
     this.stopHeartbeat()
+    
+    // 调用后端断开连接接口
+    if (this.userId) {
+      try {
+        const { default: api } = await import('@/services/api')
+        await api.disconnectWebSocket()
+        console.log('已通知后端断开连接')
+      } catch (error) {
+        console.error('通知后端断开连接失败:', error)
+      }
+    }
+    
     if (this.ws) {
       this.ws.close(1000, '用户主动断开')
       this.ws = null
@@ -251,7 +267,7 @@ class NotificationWebSocket {
 
   // 获取连接状态
   isConnected() {
-    return this.ws && this.ws.readyState === WebSocket.OPEN
+    return this.ws && this.ws.readyState === 1  // SockJS uses 1 for OPEN
   }
 }
 

@@ -25,7 +25,10 @@
           </div>
         </div>
         <div class="user-details">
-          <h1>{{ userInfo.displayName || userInfo.username }}</h1>
+          <h1>
+            {{ userInfo.displayName || userInfo.username }}
+            <span v-if="isCurrentUser && notificationStore.isConnected" class="online-status">在线</span>
+          </h1>
           <p class="bio">{{ userInfo.bio || '这个人很懒，什么都没写~' }}</p>
           <p class="email" v-if="userInfo.email">{{ userInfo.email }}</p>
           <p class="ip-location" v-if="userInfo.lastLoginIpLocation">IP属地：{{ userInfo.lastLoginIpLocation }}</p>
@@ -154,11 +157,13 @@ import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 import apiClient from '@/services/axios'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const notificationStore = useNotificationStore()
 
 const userPosts = ref([])
 const showEditModal = ref(false)
@@ -633,6 +638,17 @@ const uploadAvatar = async (file) => {
   margin: 0;
   font-size: 24px;
   color: #333;
+}
+
+.online-status {
+  font-size: 12px;
+  color: #52c41a;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 12px;
+  font-weight: 500;
 }
 
 .bio {
